@@ -1,0 +1,6 @@
+{
+  "name": "libmedia_kit_ohos_video.so",
+  "types": "./Index.d.ts",
+  "version": "1.0.0",
+  "description": "media_kit ohos video render native module"
+}
