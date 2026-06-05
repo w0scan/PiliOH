@@ -379,9 +379,7 @@ void MediaKitOhosVideo::RenderLoop() {
 
     bool resized = wantResize_.exchange(false);
 
-    int w = width_.load();
-    int h = height_.load();
-    if (w <= 0 || h <= 0) {
+    if (width_.load() <= 0 || height_.load() <= 0) {
       continue;
     }
 
@@ -389,6 +387,21 @@ void MediaKitOhosVideo::RenderLoop() {
     if (!resized && !(flags & MPV_RENDER_UPDATE_FRAME)) {
       continue;
     }
+
+    // The render viewport must match the *actual* EGL surface (the on-screen
+    // buffer), not the source video size. For the Flutter texture the surface
+    // buffer is forced to the video size via SET_BUFFER_GEOMETRY so the two
+    // agree; but the PiP XComponent surface has its own system-chosen size and
+    // ignores SET_BUFFER_GEOMETRY. Using the video size there sets a GL viewport
+    // larger/smaller than the surface, leaving the frame cropped to the
+    // bottom-left (e.g. 1080p) or shrunk into the bottom-left with black margins
+    // (e.g. 480p). Query the real surface size so mpv scales (keeping aspect) to
+    // fill it; this also tracks live PiP-window resizes for free.
+    EGLint surfW = 0, surfH = 0;
+    eglQuerySurface(display_, surface_, EGL_WIDTH, &surfW);
+    eglQuerySurface(display_, surface_, EGL_HEIGHT, &surfH);
+    int w = surfW > 0 ? static_cast<int>(surfW) : width_.load();
+    int h = surfH > 0 ? static_cast<int>(surfH) : height_.load();
 
     mpv_opengl_fbo fbo{};
     fbo.fbo = 0;  // default framebuffer of the window surface
