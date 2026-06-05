@@ -29,6 +29,7 @@ import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/theme_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
+import 'package:PiliPlus/utils/wakelock_ohos.dart';
 import 'package:catcher_2/catcher_2.dart';
 import 'package:collection/collection.dart';
 import 'package:dynamic_color/dynamic_color.dart';
@@ -99,6 +100,11 @@ Future<void> _initAppPath() async {
 void main() async {
   ScaledWidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
+  // wakelock_plus has no ohos implementation; route keep-screen-on to our
+  // native MethodChannel. Must run before the first WakelockPlus call.
+  if (Platform.isOhos) {
+    OhosWakelock.register();
+  }
   await _initAppPath();
   try {
     await GStorage.init();

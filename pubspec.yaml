@@ -161,6 +161,9 @@ dependencies:
   uuid: ^4.5.1
   vector_math: ^2.2.0
   wakelock_plus: ^1.2.8
+  # Direct dependency so the ohos keep-screen-on shim (lib/utils/wakelock_ohos.dart)
+  # can implement the platform interface.
+  wakelock_plus_platform_interface: ^1.5.1
   waterfall_flow: ^3.1.0
   web_socket_channel: ^3.0.3
   webdav_client:
@@ -179,6 +182,9 @@ dependency_overrides:
   app_links: 7.0.0
   saver_gallery: 4.1.2
   # <<< ohos-sdk-pins
+  # 2.6.0 pulls objective_c, whose native-assets build hook aborts the ohos
+  # build with `FormatException: The OS "ohos" is not known`. Pin below it.
+  path_provider_foundation: 2.5.1
   flutter_inappwebview_android:
     git:
       url: https://github.com/bggRGjQaUbCoE/flutter_inappwebview.git
