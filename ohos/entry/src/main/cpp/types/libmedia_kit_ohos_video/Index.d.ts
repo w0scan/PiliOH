@@ -7,3 +7,7 @@
 export const create: (handle: bigint, window: number, width: number, height: number) => void;
 export const setSize: (handle: bigint, width: number, height: number) => void;
 export const dispose: (handle: bigint) => void;
+// Move the live render output onto a Picture-in-Picture XComponent surface
+// (identified by its OHOS surface id) or back to the Flutter texture window.
+export const rebind: (handle: bigint, surfaceId: bigint) => void;
+export const rebindToFlutter: (handle: bigint) => void;

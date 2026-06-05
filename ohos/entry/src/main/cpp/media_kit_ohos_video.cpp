@@ -68,7 +68,8 @@ void MediaKitOhosVideo::Destroy(mpv_handle* mpv) {
 MediaKitOhosVideo::MediaKitOhosVideo(mpv_handle* mpv, void* window, int width,
                                      int height)
     : mpv_(mpv),
-      window_(static_cast<NativeWindow*>(window)) {
+      window_(static_cast<NativeWindow*>(window)),
+      flutterWindow_(static_cast<NativeWindow*>(window)) {
   width_ = width;
   height_ = height;
   if (window_ != nullptr && width > 0 && height > 0) {
@@ -97,6 +98,32 @@ void MediaKitOhosVideo::SetSize(int width, int height) {
   }
   wantResize_ = true;
   RequestRedraw();
+}
+
+// --------------------------------------------------------------------------
+// Picture-in-Picture: move the live render output between the Flutter texture
+// window and a PiP XComponent surface. The actual EGL surface swap happens on
+// the render thread (RecreateSurface) so the GL context is only ever touched
+// from its owning thread.
+// --------------------------------------------------------------------------
+void MediaKitOhosVideo::RebindToSurface(uint64_t surfaceId) {
+  {
+    std::lock_guard<std::mutex> lock(renderMutex_);
+    pendingSurfaceId_ = surfaceId;
+    pendingToFlutter_ = false;
+    wantRebind_ = true;
+  }
+  renderCond_.notify_one();
+}
+
+void MediaKitOhosVideo::RebindToFlutter() {
+  {
+    std::lock_guard<std::mutex> lock(renderMutex_);
+    pendingSurfaceId_ = 0;
+    pendingToFlutter_ = true;
+    wantRebind_ = true;
+  }
+  renderCond_.notify_one();
 }
 
 // --------------------------------------------------------------------------
@@ -185,6 +212,35 @@ bool MediaKitOhosVideo::InitEgl() {
   return true;
 }
 
+// Recreate only the window surface against the current window_, preserving the
+// EGL display/context. Runs on the render thread.
+bool MediaKitOhosVideo::RecreateSurface() {
+  eglMakeCurrent(display_, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+  if (surface_ != EGL_NO_SURFACE) {
+    eglDestroySurface(display_, surface_);
+    surface_ = EGL_NO_SURFACE;
+  }
+  if (window_ == nullptr) {
+    return false;
+  }
+  surface_ = eglCreateWindowSurface(
+      display_, config_, reinterpret_cast<EGLNativeWindowType>(window_),
+      nullptr);
+  if (surface_ == EGL_NO_SURFACE) {
+    OH_LOG_ERROR(LOG_APP,
+                 "%{public}s: RecreateSurface eglCreateWindowSurface failed: "
+                 "0x%{public}x",
+                 kTag, eglGetError());
+    return false;
+  }
+  if (!eglMakeCurrent(display_, surface_, surface_, context_)) {
+    OH_LOG_ERROR(LOG_APP, "%{public}s: RecreateSurface eglMakeCurrent failed",
+                 kTag);
+    return false;
+  }
+  return true;
+}
+
 void MediaKitOhosVideo::DestroyEgl() {
   if (display_ != EGL_NO_DISPLAY) {
     eglMakeCurrent(display_, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
@@ -261,16 +317,64 @@ void MediaKitOhosVideo::RenderLoop() {
   OH_LOG_INFO(LOG_APP, "%{public}s: render context created", kTag);
 
   while (renderRunning_) {
+    uint64_t rebindSurfaceId = 0;
+    bool rebindToFlutter = false;
+    bool doRebind = false;
     {
       std::unique_lock<std::mutex> lock(renderMutex_);
       renderCond_.wait(lock, [this] {
         return wantRedraw_.load() || wantResize_.load() ||
-               !renderRunning_.load();
+               wantRebind_.load() || !renderRunning_.load();
       });
       wantRedraw_ = false;
+      if (wantRebind_.exchange(false)) {
+        doRebind = true;
+        rebindSurfaceId = pendingSurfaceId_;
+        rebindToFlutter = pendingToFlutter_;
+      }
     }
     if (!renderRunning_) {
       break;
+    }
+
+    if (doRebind) {
+      NativeWindow* target = nullptr;
+      if (rebindToFlutter) {
+        target = flutterWindow_;
+      } else if (rebindSurfaceId != 0) {
+        OHNativeWindow* nw = nullptr;
+        int32_t ret = OH_NativeWindow_CreateNativeWindowFromSurfaceId(
+            rebindSurfaceId, &nw);
+        if (ret != 0 || nw == nullptr) {
+          OH_LOG_ERROR(LOG_APP,
+                       "%{public}s: CreateNativeWindowFromSurfaceId failed: "
+                       "%{public}d",
+                       kTag, ret);
+        } else {
+          target = reinterpret_cast<NativeWindow*>(nw);
+        }
+      }
+      if (target != nullptr) {
+        // Release a previously-created PiP window if we are leaving it.
+        if (pipWindow_ != nullptr &&
+            reinterpret_cast<NativeWindow*>(pipWindow_) != target) {
+          OH_NativeWindow_DestroyNativeWindow(
+              reinterpret_cast<OHNativeWindow*>(pipWindow_));
+          pipWindow_ = nullptr;
+        }
+        if (!rebindToFlutter) {
+          pipWindow_ = target;  // remember so we can destroy it later
+        }
+        window_ = target;
+        if (width_.load() > 0 && height_.load() > 0) {
+          OH_NativeWindow_NativeWindowHandleOpt(
+              reinterpret_cast<OHNativeWindow*>(window_), SET_BUFFER_GEOMETRY,
+              width_.load(), height_.load());
+        }
+        if (RecreateSurface()) {
+          wantResize_ = true;  // force a fresh frame into the new surface
+        }
+      }
     }
 
     bool resized = wantResize_.exchange(false);
@@ -308,5 +412,12 @@ void MediaKitOhosVideo::RenderLoop() {
     renderCtx_ = nullptr;
   }
   DestroyEgl();
+  // Release any PiP window we created. The Flutter texture window is owned by
+  // Flutter's TextureRegistry, so we never destroy it here.
+  if (pipWindow_ != nullptr) {
+    OH_NativeWindow_DestroyNativeWindow(
+        reinterpret_cast<OHNativeWindow*>(pipWindow_));
+    pipWindow_ = nullptr;
+  }
   OH_LOG_INFO(LOG_APP, "%{public}s: render loop exited", kTag);
 }

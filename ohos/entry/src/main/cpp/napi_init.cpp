@@ -81,6 +81,36 @@ napi_value JsDispose(napi_env env, napi_callback_info info) {
   return nullptr;
 }
 
+// rebind(handle: bigint, surfaceId: bigint): void
+// Move the live render output onto a PiP XComponent surface.
+napi_value JsRebind(napi_env env, napi_callback_info info) {
+  size_t argc = 2;
+  napi_value args[2] = {nullptr, nullptr};
+  napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+
+  auto* mpv = reinterpret_cast<mpv_handle*>(GetBigIntArg(env, args[0]));
+  uint64_t surfaceId = argc > 1 ? GetBigIntArg(env, args[1]) : 0;
+
+  if (auto* video = MediaKitOhosVideo::Get(mpv)) {
+    video->RebindToSurface(surfaceId);
+  }
+  return nullptr;
+}
+
+// rebindToFlutter(handle: bigint): void
+// Move the live render output back to the Flutter texture window.
+napi_value JsRebindToFlutter(napi_env env, napi_callback_info info) {
+  size_t argc = 1;
+  napi_value args[1] = {nullptr};
+  napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+
+  auto* mpv = reinterpret_cast<mpv_handle*>(GetBigIntArg(env, args[0]));
+  if (auto* video = MediaKitOhosVideo::Get(mpv)) {
+    video->RebindToFlutter();
+  }
+  return nullptr;
+}
+
 napi_value Init(napi_env env, napi_value exports) {
   napi_property_descriptor desc[] = {
       {"create", nullptr, JsCreate, nullptr, nullptr, nullptr, napi_default,
@@ -89,6 +119,10 @@ napi_value Init(napi_env env, napi_value exports) {
        nullptr},
       {"dispose", nullptr, JsDispose, nullptr, nullptr, nullptr, napi_default,
        nullptr},
+      {"rebind", nullptr, JsRebind, nullptr, nullptr, nullptr, napi_default,
+       nullptr},
+      {"rebindToFlutter", nullptr, JsRebindToFlutter, nullptr, nullptr, nullptr,
+       napi_default, nullptr},
   };
   napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
   return exports;

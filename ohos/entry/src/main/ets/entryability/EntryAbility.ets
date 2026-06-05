@@ -10,12 +10,14 @@ import {
 import window from '@ohos.window';
 import { GeneratedPluginRegistrant } from '../plugins/GeneratedPluginRegistrant';
 import MediaKitVideoPlugin from '../plugins/MediaKitVideoPlugin';
+import PiPManager from '../plugins/PiPManager';
 
 const TAG = 'EntryAbility';
 
 export default class EntryAbility extends FlutterAbility {
   private mainWin: window.Window | null = null;
   private wakelockChannel: MethodChannel | null = null;
+  private pipChannel: MethodChannel | null = null;
   // Desired keep-screen-on state. Cached so we can (re)apply it once the
   // window exists, and answer the isEnabled query.
   private keepScreenOn: boolean = false;
@@ -50,13 +52,75 @@ export default class EntryAbility extends FlutterAbility {
         }
       },
     });
+
+    // OpenHarmony Picture-in-Picture. The Dart side (OhosPipHelper) passes the
+    // mpv core handle (decimal string) so the native render output can be
+    // rebound onto the PiP window surface and back.
+    this.pipChannel = new MethodChannel(
+      flutterEngine.getDartExecutor(),
+      'piliplus/pip',
+    );
+    PiPManager.getInstance().setChannel(this.pipChannel);
+    this.pipChannel.setMethodCallHandler({
+      onMethodCall: (call: MethodCall, result: MethodResult): void => {
+        switch (call.method) {
+          case 'isSupported':
+            result.success(PiPManager.getInstance().isSupported());
+            break;
+          case 'enter': {
+            const handle = call.argument('handle') as string;
+            const width = call.argument('width') as number;
+            const height = call.argument('height') as number;
+            const autoStart = call.argument('autoStart') as boolean;
+            const isPlaying = call.argument('isPlaying') as boolean;
+            PiPManager.getInstance()
+              .enter(handle, width, height, autoStart === true, isPlaying !== false)
+              .then((): void => result.success(true))
+              .catch((e: Object): void => {
+                Log.e(TAG, 'pip enter failed: ' + JSON.stringify(e));
+                result.success(false);
+              });
+            break;
+          }
+          case 'exit':
+            PiPManager.getInstance()
+              .exit()
+              .then((): void => result.success(null))
+              .catch((): void => result.success(null));
+            break;
+          case 'setAutoStart':
+            PiPManager.getInstance().setAutoStart(call.args as boolean);
+            result.success(null);
+            break;
+          case 'setPlaybackState':
+            PiPManager.getInstance().setPlaybackState(call.args as boolean);
+            result.success(null);
+            break;
+          case 'updateContentSize': {
+            const width = call.argument('width') as number;
+            const height = call.argument('height') as number;
+            PiPManager.getInstance().updateContentSize(width, height);
+            result.success(null);
+            break;
+          }
+          default:
+            result.notImplemented();
+        }
+      },
+    });
   }
 
   onWindowStageCreate(windowStage: window.WindowStage) {
     super.onWindowStageCreate(windowStage)
-    this.mainWin = windowStage.getMainWindowSync();
+    const mainWin = windowStage.getMainWindowSync();
+    this.mainWin = mainWin;
     // Re-apply in case a toggle arrived before the window was ready.
     this.applyKeepScreenOn();
+    // PiPWindow.create needs an ability context + a UIContext to build the
+    // content XComponent node. The UIContext isn't ready yet here (Flutter
+    // hasn't finished loadContent), so PiPManager resolves it lazily from the
+    // window on first use.
+    PiPManager.getInstance().setContext(this.context, mainWin);
   }
 
   private applyKeepScreenOn(): void {

@@ -37,6 +37,13 @@ class MediaKitOhosVideo {
 
   void SetSize(int width, int height);
 
+  // Move the live render output to a Picture-in-Picture XComponent surface
+  // (identified by its OHOS surface id) or back to the original Flutter
+  // texture window. The EGL window surface is swapped on the render thread so
+  // the same mpv render context keeps producing frames into the new target.
+  void RebindToSurface(uint64_t surfaceId);
+  void RebindToFlutter();
+
  private:
   explicit MediaKitOhosVideo(mpv_handle* mpv, void* window, int width,
                              int height);
@@ -47,6 +54,10 @@ class MediaKitOhosVideo {
 
   bool InitEgl();
   void DestroyEgl();
+
+  // Recreate only the EGL window surface against window_ (called on the render
+  // thread when a rebind is pending). Returns false on failure.
+  bool RecreateSurface();
 
   void StartRenderThread();
   void StopRenderThread();
@@ -62,6 +73,18 @@ class MediaKitOhosVideo {
   EGLSurface surface_ = EGL_NO_SURFACE;
   EGLConfig config_ = nullptr;
   NativeWindow* window_ = nullptr;
+  // The original Flutter-texture window passed at Create time. Never owned by
+  // us (Flutter's TextureRegistry owns it); kept so we can rebind back to it
+  // after Picture-in-Picture ends.
+  NativeWindow* flutterWindow_ = nullptr;
+  // A PiP XComponent window we created via CreateNativeWindowFromSurfaceId.
+  // Owned by us and destroyed when we rebind away from it. Touched only by the
+  // render thread.
+  NativeWindow* pipWindow_ = nullptr;
+  // Rebind request handed to the render thread. Guarded by renderMutex_.
+  uint64_t pendingSurfaceId_ = 0;
+  bool pendingToFlutter_ = false;
+  std::atomic<bool> wantRebind_{false};
   std::atomic<int> width_{0};
   std::atomic<int> height_{0};
 
