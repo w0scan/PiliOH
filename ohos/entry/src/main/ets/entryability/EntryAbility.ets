@@ -11,6 +11,7 @@ import window from '@ohos.window';
 import { GeneratedPluginRegistrant } from '../plugins/GeneratedPluginRegistrant';
 import MediaKitVideoPlugin from '../plugins/MediaKitVideoPlugin';
 import PiPManager from '../plugins/PiPManager';
+import FilePickerOhos from '../plugins/FilePickerOhos';
 
 const TAG = 'EntryAbility';
 
@@ -106,6 +107,18 @@ export default class EntryAbility extends FlutterAbility {
           default:
             result.notImplemented();
         }
+      },
+    });
+
+    // OpenHarmony file picker (save/import). The Dart side (OhosFilePicker)
+    // talks to this channel so export/import can use native system dialogs.
+    const filePickerChannel = new MethodChannel(
+      flutterEngine.getDartExecutor(),
+      'piliplus/file_picker',
+    );
+    filePickerChannel.setMethodCallHandler({
+      onMethodCall: (call: MethodCall, result: MethodResult): void => {
+        FilePickerOhos.handleCall(call, result);
       },
     });
   }
