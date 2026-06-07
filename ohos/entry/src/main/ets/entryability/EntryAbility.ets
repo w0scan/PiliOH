@@ -10,6 +10,7 @@ import {
 import window from '@ohos.window';
 import { GeneratedPluginRegistrant } from '../plugins/GeneratedPluginRegistrant';
 import MediaKitVideoPlugin from '../plugins/MediaKitVideoPlugin';
+import NativeDualPlayer from '../plugins/NativeDualPlayer';
 import PiPManager from '../plugins/PiPManager';
 import FilePickerOhos from '../plugins/FilePickerOhos';
 
@@ -30,6 +31,10 @@ export default class EntryAbility extends FlutterAbility {
     // tool regenerates GeneratedPluginRegistrant.ets on every build and would
     // drop this hand-written plugin.
     flutterEngine.getPlugins()?.add(new MediaKitVideoPlugin())
+    // Native dual-AVPlayer (OHOS-only alternative player). Registered here for
+    // the same reason as MediaKitVideoPlugin: GeneratedPluginRegistrant is
+    // regenerated each build and would drop a hand-written plugin.
+    flutterEngine.getPlugins()?.add(new NativeDualPlayer())
 
     // wakelock_plus has no ohos implementation; the Dart side (OhosWakelock)
     // talks to this channel so video playback can keep the screen awake.

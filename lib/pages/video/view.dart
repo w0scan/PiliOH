@@ -726,6 +726,9 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                                           videoDetailController.playedTime ==
                                               null) {
                                         handlePlay();
+                                      } else if (plPlayerController!
+                                          .isNativePlayer) {
+                                        plPlayerController!.onDoubleTapCenter();
                                       } else {
                                         if (plPlayerController!
                                             .videoPlayerController!
@@ -1269,7 +1272,8 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       () =>
           !videoDetailController.videoState.value ||
               !videoDetailController.autoPlay ||
-              plPlayerController?.videoController == null
+              (plPlayerController?.videoController == null &&
+                  !(plPlayerController?.isNativePlayer ?? false))
           ? const SizedBox.shrink()
           : PLVideoPlayer(
               maxWidth: width,

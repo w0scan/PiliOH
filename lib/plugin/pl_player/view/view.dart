@@ -38,6 +38,7 @@ import 'package:PiliPlus/pages/video/post_panel/popup_menu_text.dart';
 import 'package:PiliPlus/pages/video/post_panel/view.dart';
 import 'package:PiliPlus/pages/video/widgets/header_control.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
+import 'package:PiliPlus/plugin/pl_player/native/native_player_platform_view.dart';
 import 'package:PiliPlus/plugin/pl_player/models/bottom_control_type.dart';
 import 'package:PiliPlus/plugin/pl_player/models/data_status.dart';
 import 'package:PiliPlus/plugin/pl_player/models/double_tap_type.dart';
@@ -133,7 +134,8 @@ class PLVideoPlayer extends StatefulWidget {
 class _PLVideoPlayerState extends State<PLVideoPlayer>
     with WidgetsBindingObserver, TickerProviderStateMixin {
   late AnimationController _animationController;
-  late VideoController videoController;
+  // Null in OHOS native-player mode (no media_kit VideoController).
+  VideoController? videoController;
   late final CommonIntroController introController = widget.introController!;
   late final VideoDetailController videoDetailController =
       widget.videoDetailController!;
@@ -267,7 +269,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
       vsync: this,
       duration: const Duration(milliseconds: 100),
     );
-    videoController = plPlayerController.videoController!;
+    videoController = plPlayerController.videoController;
 
     if (PlatformUtils.isMobile) {
       Future.microtask(() {
@@ -1409,13 +1411,13 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
         if (widget.danmuWidget case final danmaku?)
           Positioned.fill(top: 4, child: danmaku),
 
-        if (!isLive)
+        if (!isLive && videoController != null)
           Positioned.fill(
             child: IgnorePointer(
               ignoring: !plPlayerController.enableDragSubtitle,
               child: Obx(
                 () => SubtitleView(
-                  controller: videoController,
+                  controller: videoController!,
                   configuration: plPlayerController.subtitleConfig.value,
                   enableDragSubtitle: plPlayerController.enableDragSubtitle,
                   onUpdatePadding: plPlayerController.onUpdatePadding,
@@ -2101,17 +2103,35 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
             child: Obx(
               () {
                 final videoFit = plPlayerController.videoFit.value;
+                if (plPlayerController.isNativePlayer) {
+                  // Native dual-AVPlayer renders into an XComponent hosted by
+                  // this platform view; size the box to the video's aspect so
+                  // the XComponent isn't stretched (e.g. portrait videos).
+                  const view = NativePlayerPlatformView();
+                  final w = plPlayerController.width ?? 0;
+                  final h = plPlayerController.height ?? 0;
+                  if (w <= 0 || h <= 0) {
+                    return view;
+                  }
+                  return Center(
+                    child: AspectRatio(
+                      aspectRatio: w / h,
+                      child: view,
+                    ),
+                  );
+                }
+                final Widget videoWidget = SimpleVideo(
+                  controller: plPlayerController.videoController!,
+                  fill: widget.fill,
+                  aspectRatio: videoFit.aspectRatio,
+                );
                 return Transform.flip(
                   flipX: plPlayerController.flipX.value,
                   flipY: plPlayerController.flipY.value,
                   child: FittedBox(
                     fit: videoFit.boxFit,
                     alignment: widget.alignment,
-                    child: SimpleVideo(
-                      controller: plPlayerController.videoController!,
-                      fill: widget.fill,
-                      aspectRatio: videoFit.aspectRatio,
-                    ),
+                    child: videoWidget,
                   ),
                 );
               },

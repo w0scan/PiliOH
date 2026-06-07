@@ -45,6 +45,7 @@ import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/theme_utils.dart';
+import 'package:PiliPlus/utils/ohos/ohos_native_player.dart';
 import 'package:PiliPlus/utils/ohos/ohos_pip_helper.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:archive/archive.dart' show getCrc32;
@@ -186,6 +187,21 @@ class PlPlayerController with BlockConfigMixin {
 
   /// [videoController] instance of Player
   VideoController? get videoController => _videoController;
+
+  // OHOS native dual-AVPlayer backend (alternative to media_kit). When active,
+  // the media_kit Player is never created; playback is driven over
+  // OhosNativePlayer and the view renders [nativeTextureId] via a Texture
+  // widget. Gated to non-live video on OHOS (Pref.useNativePlayer implies OHOS).
+  bool get isNativePlayer => Pref.useNativePlayer && !isLive;
+  final Rx<int?> nativeTextureId = Rx<int?>(null);
+  // Real decoded video size for the native backend; drives the Texture's box so
+  // it has correct aspect and never a zero dimension.
+  final Rx<Size?> nativeVideoSize = Rx<Size?>(null);
+  // AVPlayer's timeUpdate is only ~1Hz; interpolate position at ~100ms so the
+  // progress bar is smooth and danmaku (sampled in 100ms buckets) shows.
+  Timer? _nativeTicker;
+  Duration _nativePosBase = Duration.zero;
+  final Stopwatch _nativeWatch = Stopwatch();
 
   bool isMuted = false;
 
@@ -689,7 +705,10 @@ class PlPlayerController with BlockConfigMixin {
       }
 
       // 获取视频时长 00:00
-      this.duration.value = duration ?? _videoPlayerController!.state.duration;
+      this.duration.value =
+          duration ??
+          _videoPlayerController?.state.duration ??
+          this.duration.value;
       position = buffered.value = sliderPosition = seekTo ?? Duration.zero;
       updatePositionSecond();
       updateSliderPositionSecond();
@@ -731,6 +750,9 @@ class PlPlayerController with BlockConfigMixin {
   late final Rx<SuperResolutionType> superResolutionType =
       (isAnim ? Pref.superResolutionType : SuperResolutionType.disable).obs;
   Future<void> setShader([SuperResolutionType? type, NativePlayer? pp]) async {
+    if (isNativePlayer) {
+      return;
+    }
     if (type == null) {
       type = superResolutionType.value;
     } else {
@@ -829,6 +851,11 @@ class PlPlayerController with BlockConfigMixin {
     // 初始化时清空弹幕，防止上次重叠
     danmakuController?.clear();
 
+    if (isNativePlayer) {
+      await _createNativePlayer(dataSource, seekTo);
+      return;
+    }
+
     var player = _videoPlayerController;
 
     if (player == null) {
@@ -893,7 +920,147 @@ class PlPlayerController with BlockConfigMixin {
     );
   }
 
+  // ----- OHOS native dual-AVPlayer backend -----
+
+  Future<void> _createNativePlayer(
+    DataSource dataSource,
+    Duration? seekTo,
+  ) async {
+    _setupNativeCallbacks();
+    // No Flutter texture: the XComponent platform view (OhosView in the player
+    // view) provides the render surface to the native dual player.
+
+    String video = dataSource.videoSource;
+    String? audio = dataSource.audioSource;
+    if (onlyPlayAudio.value && audio != null && audio.isNotEmpty) {
+      // Audio-only: drive the single (audio) source through the video slot.
+      video = audio;
+      audio = null;
+    }
+    await OhosNativePlayer.setSource(
+      videoUrl: video,
+      audioUrl: audio,
+      headers: {
+        'User-Agent': BrowserUa.pc,
+        'Referer': HttpString.baseUrl,
+      },
+      startMs: seekTo?.inMilliseconds ?? 0,
+      syncMaster: Pref.nativeSyncMaster,
+      syncThresholdMs: Pref.nativeSyncThresholdMs,
+      width: width ?? 0,
+      height: height ?? 0,
+    );
+    if (_autoPlay) {
+      await OhosNativePlayer.play();
+    }
+  }
+
+  // Feed the same observables the media_kit listeners drive, so all the
+  // existing UI (progress bar, gestures, danmaku timing, heartbeat) keeps
+  // working unchanged with the native backend.
+  void _setupNativeCallbacks() {
+    OhosNativePlayer.onPosition = (ms) {
+      // Authoritative resync from the player; the ticker interpolates between.
+      _nativePosBase = Duration(milliseconds: ms);
+      _nativeWatch
+        ..reset()
+        ..start();
+      _applyNativePosition(_nativePosBase);
+    };
+    OhosNativePlayer.onDuration = (ms) {
+      duration.value = Duration(milliseconds: ms);
+    };
+    OhosNativePlayer.onBuffered = (ms) {
+      buffered.value = Duration(milliseconds: ms);
+      updateBufferedSecond();
+    };
+    OhosNativePlayer.onBuffering = (event) {
+      isBuffering.value = event;
+      videoPlayerServiceHandler?.onStatusChange(
+        playerStatus.value,
+        event,
+        isLive,
+      );
+    };
+    OhosNativePlayer.onPlayingChanged = (playing) {
+      WakelockPlus.toggle(enable: playing);
+      playerStatus.value = playing
+          ? PlayerStatus.playing
+          : PlayerStatus.paused;
+      if (playing) {
+        _nativeWatch
+          ..reset()
+          ..start();
+        _startNativeTicker();
+      } else {
+        _nativeWatch.stop();
+      }
+      for (final element in _statusListeners) {
+        element(playerStatus.value);
+      }
+      videoPlayerServiceHandler?.onStatusChange(
+        playerStatus.value,
+        isBuffering.value,
+        isLive,
+      );
+    };
+    OhosNativePlayer.onCompleted = () {
+      playerStatus.value = PlayerStatus.completed;
+      _nativeWatch.stop();
+      for (final element in _statusListeners) {
+        element(PlayerStatus.completed);
+      }
+      makeHeartBeat(positionSeconds.value, type: HeartBeatType.completed);
+    };
+    OhosNativePlayer.onError = (msg) {
+      if (kDebugMode) debugPrint('native player error: $msg');
+    };
+    OhosNativePlayer.onVideoSize = (w, h) {
+      width = w;
+      height = h;
+      nativeVideoSize.value = Size(w.toDouble(), h.toDouble());
+    };
+  }
+
+  // Push an (interpolated or authoritative) position through the same pipeline
+  // the media_kit position stream uses, so progress bar / danmaku / heartbeat
+  // all update.
+  void _applyNativePosition(Duration p) {
+    position = p;
+    updatePositionSecond();
+    if (!isSliderMoving.value) {
+      sliderPosition = p;
+      updateSliderPositionSecond();
+    }
+    for (final element in _positionListeners) {
+      element(p);
+    }
+    makeHeartBeat(p.inSeconds);
+  }
+
+  void _startNativeTicker() {
+    _nativeTicker ??= Timer.periodic(const Duration(milliseconds: 100), (_) {
+      if (!playerStatus.isPlaying || !_nativeWatch.isRunning) {
+        return;
+      }
+      final elapsed = (_nativeWatch.elapsedMilliseconds * _playbackSpeed.value)
+          .round();
+      final p = _nativePosBase + Duration(milliseconds: elapsed);
+      final dur = duration.value;
+      _applyNativePosition(dur > Duration.zero && p > dur ? dur : p);
+    });
+  }
+
+  void _stopNativeTicker() {
+    _nativeTicker?.cancel();
+    _nativeTicker = null;
+    _nativeWatch.stop();
+  }
+
   Future<void>? refreshPlayer() {
+    if (isNativePlayer) {
+      return null;
+    }
     if (dataSource is FileSource) {
       return null;
     }
@@ -1132,6 +1299,16 @@ class PlPlayerController with BlockConfigMixin {
         await _videoPlayerController?.stream.buffer.first;
       }
       danmakuController?.clear();
+      if (isNativePlayer) {
+        _nativePosBase = position;
+        if (playerStatus.isPlaying) {
+          _nativeWatch
+            ..reset()
+            ..start();
+        }
+        await OhosNativePlayer.seek(position.inMilliseconds);
+        return;
+      }
       try {
         await _videoPlayerController?.seek(position);
       } catch (e) {
@@ -1160,6 +1337,9 @@ class PlPlayerController with BlockConfigMixin {
     }
 
     await _videoPlayerController?.setRate(speed);
+    if (isNativePlayer) {
+      await OhosNativePlayer.setSpeed(speed);
+    }
     _playbackSpeed.value = speed;
     if (danmakuController != null) {
       try {
@@ -1195,6 +1375,9 @@ class PlPlayerController with BlockConfigMixin {
     }
 
     await _videoPlayerController?.play();
+    if (isNativePlayer) {
+      await OhosNativePlayer.play();
+    }
 
     audioSessionHandler?.setActive(true);
 
@@ -1205,6 +1388,9 @@ class PlPlayerController with BlockConfigMixin {
   /// 暂停播放
   Future<void> pause({bool notify = true, bool isInterrupt = false}) async {
     await _videoPlayerController?.pause();
+    if (isNativePlayer) {
+      await OhosNativePlayer.pause();
+    }
     playerStatus.value = PlayerStatus.paused;
 
     // 主动暂停时让出音频焦点
@@ -1356,14 +1542,21 @@ class PlPlayerController with BlockConfigMixin {
   }
 
   bool get _isCompleted =>
-      videoPlayerController!.state.completed ||
+      (videoPlayerController?.state.completed ?? false) ||
       (duration.value - position).inMilliseconds <= 50;
 
   // 双击播放、暂停
   Future<void> onDoubleTapCenter() async {
     if (!isLive && _isCompleted) {
-      await videoPlayerController!.seek(Duration.zero);
-      videoPlayerController!.play();
+      if (isNativePlayer) {
+        await seekTo(Duration.zero, isSeek: false);
+        play();
+      } else {
+        await videoPlayerController!.seek(Duration.zero);
+        videoPlayerController!.play();
+      }
+    } else if (isNativePlayer) {
+      playerStatus.isPlaying ? pause() : play();
     } else {
       videoPlayerController!.playOrPause();
     }
@@ -1389,8 +1582,10 @@ class PlPlayerController with BlockConfigMixin {
   }
 
   void onForwardBackward(Duration duration) {
+    final maxDuration =
+        videoPlayerController?.state.duration ?? this.duration.value;
     seekTo(
-      duration.clamp(Duration.zero, videoPlayerController!.state.duration),
+      duration.clamp(Duration.zero, maxDuration),
       isSeek: false,
     ).whenComplete(play);
   }
@@ -1672,6 +1867,20 @@ class PlPlayerController with BlockConfigMixin {
     _videoPlayerController?.dispose();
     _videoPlayerController = null;
     _videoController = null;
+    if (isNativePlayer) {
+      _stopNativeTicker();
+      OhosNativePlayer.onPosition = null;
+      OhosNativePlayer.onDuration = null;
+      OhosNativePlayer.onBuffered = null;
+      OhosNativePlayer.onBuffering = null;
+      OhosNativePlayer.onPlayingChanged = null;
+      OhosNativePlayer.onCompleted = null;
+      OhosNativePlayer.onError = null;
+      OhosNativePlayer.onVideoSize = null;
+      OhosNativePlayer.release();
+      nativeTextureId.value = null;
+      nativeVideoSize.value = null;
+    }
     _instance = null;
     videoPlayerServiceHandler?.clear();
   }
