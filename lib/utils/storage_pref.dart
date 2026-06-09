@@ -998,4 +998,10 @@ abstract final class Pref {
   // Drift threshold (ms) beyond which the follower track seeks to the master.
   static int get nativeSyncThresholdMs =>
       _setting.get(SettingBoxKey.nativeSyncThresholdMs, defaultValue: 2000);
+
+  static double get playerVolume => // mobile
+      _setting.get(SettingBoxKey.playerVolume, defaultValue: 100.0);
+
+  static double get maxVolume => // desktop
+      _setting.get(SettingBoxKey.maxVolume, defaultValue: 2.0);
 }

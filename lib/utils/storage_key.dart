@@ -31,7 +31,9 @@ abstract final class SettingBoxKey {
       showBatteryLevel = 'showBatteryLevel',
       useNativePlayer = 'useNativePlayer',
       nativeSyncMaster = 'nativeSyncMaster',
-      nativeSyncThresholdMs = 'nativeSyncThresholdMs';
+      nativeSyncThresholdMs = 'nativeSyncThresholdMs',
+      playerVolume = 'playerVolume',
+      maxVolume = 'maxVolume';
 
   static const String enableVerticalExpand = 'enableVerticalExpand',
       feedBackEnable = 'feedBackEnable',

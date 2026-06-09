@@ -23,6 +23,8 @@ import 'package:PiliPlus/models/video/play/url.dart';
 import 'package:PiliPlus/models_new/video/video_play_info/subtitle.dart';
 import 'package:PiliPlus/pages/common/common_intro_controller.dart';
 import 'package:PiliPlus/pages/danmaku/danmaku_model.dart';
+import 'package:PiliPlus/pages/setting/models/play_settings.dart'
+    show showPlayerVolumeDialog;
 import 'package:PiliPlus/pages/setting/widgets/popup_item.dart';
 import 'package:PiliPlus/pages/setting/widgets/select_dialog.dart';
 import 'package:PiliPlus/pages/video/controller.dart';
@@ -66,6 +68,7 @@ import 'package:get/get.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:media_kit/media_kit.dart' show NativePlayer;
 
 mixin TimeBatteryMixin<T extends StatefulWidget> on State<T> {
   PlPlayerController get plPlayerController;
@@ -476,6 +479,24 @@ class HeaderControlState extends State<HeaderControl>
                   descFontSize: 12,
                   descPosType: .subtitle,
                 ),
+                if (PlatformUtils.isMobile)
+                  if (plPlayerController.videoPlayerController
+                      case final player?)
+                    Builder(
+                      builder: (context) => ListTile(
+                        dense: true,
+                        leading: const Icon(Icons.volume_up, size: 20),
+                        title: const Text('播放器音量'),
+                        subtitle: Text(
+                          '当前: ${Pref.playerVolume.toStringAsFixed(0)}%',
+                        ),
+                        onTap: () => showPlayerVolumeDialog(
+                          context,
+                          () => (context as Element).markNeedsBuild(),
+                          onChanged: player.setVolume,
+                        ),
+                      ),
+                    ),
                 if (!isFileSource)
                   ListTile(
                     dense: true,
@@ -729,15 +750,20 @@ class HeaderControlState extends State<HeaderControl>
                     leading: const Icon(Icons.download_outlined, size: 20),
                     title: const Text('保存字幕', style: titleStyle),
                   ),
-                ListTile(
-                  dense: true,
-                  title: const Text('播放信息', style: titleStyle),
-                  leading: const Icon(Icons.info_outline, size: 20),
-                  onTap: () => showPlayerInfo(
-                    context,
-                    plPlayerController: plPlayerController,
+                if (plPlayerController.videoPlayerController case final player?)
+                  ListTile(
+                    dense: true,
+                    title: const Text('播放信息', style: titleStyle),
+                    leading: const Icon(Icons.info_outline, size: 20),
+                    onTap: () => showPlayerInfo(context, player: player),
+                  )
+                else if (plPlayerController.isNativePlayer)
+                  ListTile(
+                    dense: true,
+                    title: const Text('播放信息', style: titleStyle),
+                    leading: const Icon(Icons.info_outline, size: 20),
+                    onTap: () => showNativePlayerInfo(context),
                   ),
-                ),
                 ListTile(
                   dense: true,
                   onTap: () {
@@ -759,42 +785,38 @@ class HeaderControlState extends State<HeaderControl>
     );
   }
 
+  // OHOS native dual-AVPlayer has no mpv NativePlayer; show a minimal info
+  // dialog with the player type instead.
+  static void showNativePlayerInfo(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('播放信息'),
+        content: ListTile(
+          dense: true,
+          title: const Text('播放器类型'),
+          subtitle: const Text('鸿蒙原生（双 AVPlayer）'),
+          onTap: () => Utils.copyText('播放器类型\n鸿蒙原生（双 AVPlayer）'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: Get.back,
+            child: Text(
+              '确定',
+              style: TextStyle(color: ColorScheme.of(context).outline),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   static void showPlayerInfo(
     BuildContext context, {
-    required PlPlayerController plPlayerController,
+    required NativePlayer player,
   }) {
-    final bool isNativePlayer =
-        Pref.useNativePlayer && !plPlayerController.isLive;
-    final player = plPlayerController.videoPlayerController;
-    if (player == null) {
-      if (isNativePlayer) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('播放信息'),
-            content: ListTile(
-              dense: true,
-              title: const Text('播放器类型'),
-              subtitle: const Text('鸿蒙原生（双 AVPlayer）'),
-              onTap: () => Utils.copyText('播放器类型\n鸿蒙原生（双 AVPlayer）'),
-            ),
-            actions: [
-              TextButton(
-                onPressed: Get.back,
-                child: Text(
-                  '确定',
-                  style: TextStyle(color: ColorScheme.of(context).outline),
-                ),
-              ),
-            ],
-          ),
-        );
-        return;
-      }
-      SmartDialog.showToast('播放器未初始化');
-      return;
-    }
     final hwdec = player.getProperty('hwdec-current');
+    final volume = player.getProperty('volume').subLength(3);
     showDialog(
       context: context,
       builder: (context) {
@@ -822,9 +844,7 @@ class HeaderControlState extends State<HeaderControl>
                     ListTile(
                       dense: true,
                       title: const Text("Resolution"),
-                      subtitle: Text(
-                        '${state.width}x${state.height}',
-                      ),
+                      subtitle: Text('${state.width}x${state.height}'),
                       onTap: () => Utils.copyText(
                         'Resolution\n${state.width}x${state.height}',
                       ),
@@ -832,60 +852,42 @@ class HeaderControlState extends State<HeaderControl>
                     ListTile(
                       dense: true,
                       title: const Text("VideoParams"),
-                      subtitle: Text(
-                        state.videoParams.toString(),
-                      ),
-                      onTap: () => Utils.copyText(
-                        'VideoParams\n${state.videoParams}',
-                      ),
+                      subtitle: Text(state.videoParams.toString()),
+                      onTap: () =>
+                          Utils.copyText('VideoParams\n${state.videoParams}'),
                     ),
                     ListTile(
                       dense: true,
                       title: const Text("AudioParams"),
-                      subtitle: Text(
-                        state.audioParams.toString(),
-                      ),
-                      onTap: () => Utils.copyText(
-                        'AudioParams\n${state.audioParams}',
-                      ),
+                      subtitle: Text(state.audioParams.toString()),
+                      onTap: () =>
+                          Utils.copyText('AudioParams\n${state.audioParams}'),
                     ),
                     ListTile(
                       dense: true,
                       title: const Text("Media"),
-                      subtitle: Text(
-                        state.playlist.toString(),
-                      ),
-                      onTap: () => Utils.copyText(
-                        'Media\n${state.playlist}',
-                      ),
+                      subtitle: Text(state.playlist.toString()),
+                      onTap: () => Utils.copyText('Media\n${state.playlist}'),
                     ),
                     ListTile(
                       dense: true,
                       title: const Text("AudioTrack"),
-                      subtitle: Text(
-                        state.track.audio.toString(),
-                      ),
-                      onTap: () => Utils.copyText(
-                        'AudioTrack\n${state.track.audio}',
-                      ),
+                      subtitle: Text(state.track.audio.toString()),
+                      onTap: () =>
+                          Utils.copyText('AudioTrack\n${state.track.audio}'),
                     ),
                     ListTile(
                       dense: true,
                       title: const Text("VideoTrack"),
-                      subtitle: Text(
-                        state.track.video.toString(),
-                      ),
-                      onTap: () => Utils.copyText(
-                        'VideoTrack\n${state.track.audio}',
-                      ),
+                      subtitle: Text(state.track.video.toString()),
+                      onTap: () =>
+                          Utils.copyText('VideoTrack\n${state.track.audio}'),
                     ),
                     ListTile(
                       dense: true,
                       title: const Text("pitch"),
                       subtitle: Text(state.pitch.toString()),
-                      onTap: () => Utils.copyText(
-                        'pitch\n${state.pitch}',
-                      ),
+                      onTap: () => Utils.copyText('pitch\n${state.pitch}'),
                     ),
                     ListTile(
                       dense: true,
@@ -896,12 +898,8 @@ class HeaderControlState extends State<HeaderControl>
                     ListTile(
                       dense: true,
                       title: const Text("Volume"),
-                      subtitle: Text(
-                        state.volume.toString(),
-                      ),
-                      onTap: () => Utils.copyText(
-                        'Volume\n${state.volume}',
-                      ),
+                      subtitle: Text(volume.toString()),
+                      onTap: () => Utils.copyText('Volume\n$volume'),
                     ),
                     ListTile(
                       dense: true,
