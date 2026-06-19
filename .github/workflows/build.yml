@@ -91,6 +91,15 @@ jobs:
             restore-keys: |
               ${{ runner.os }}-ohos-gradle-
 
+        # 4. 缓存配置 (放在 setup 步骤之后)
+        - name: 缓存鸿蒙命令行工具
+          uses: actions/cache@v4
+          with:
+            path: ~/ohos-sdk
+            key: ${{ runner.os }}-ohos-sdk-v1
+            restore-keys: |
+              ${{ runner.os }}-ohos-sdk-
+              
         - name: 下载并配置鸿蒙命令行工具
           id: setup-ohos
           run: |
@@ -184,14 +193,7 @@ jobs:
             # 显示 SDK 大小
             echo "📦 SDK 大小: $(du -sh $OHOS_SDK_PATH | cut -f1)"
 
-        # 4. 缓存配置 (放在 setup 步骤之后)
-        - name: 缓存鸿蒙命令行工具
-          uses: actions/cache@v4
-          with:
-            path: ~/ohos-sdk
-            key: ${{ runner.os }}-ohos-sdk-v1
-            restore-keys: |
-              ${{ runner.os }}-ohos-sdk-
+        
         - name: 缓存Pub依赖
           uses: actions/cache@v4
           with:
