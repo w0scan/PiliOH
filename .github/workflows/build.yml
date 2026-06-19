@@ -29,7 +29,7 @@ jobs:
     ohos:
       if: ${{ (github.event_name == 'pull_request' && github.repository == 'bggRGjQaUbCoE/PiliPlus') || github.event.inputs.build_ohos == 'true' }}
       name: Release HarmonyOS HAP
-      runs-on: macos-15
+      runs-on: macos-latest
       permissions: write-all
 
       steps:
@@ -99,7 +99,7 @@ jobs:
             key: ${{ runner.os }}-ohos-sdk-v1
             restore-keys: |
               ${{ runner.os }}-ohos-sdk-
-              
+
         - name: 下载并配置鸿蒙命令行工具
           id: setup-ohos
           run: |
