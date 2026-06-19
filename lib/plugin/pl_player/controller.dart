@@ -36,6 +36,7 @@ import 'package:PiliPlus/utils/android/android_helper.dart';
 import 'package:PiliPlus/utils/android/bindings.g.dart';
 import 'package:PiliPlus/utils/asset_utils.dart';
 import 'package:PiliPlus/utils/device_utils.dart';
+import 'package:PiliPlus/utils/duration_utils.dart';
 import 'package:PiliPlus/utils/extension/box_ext.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
@@ -46,7 +47,6 @@ import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
-import 'package:PiliPlus/utils/theme_utils.dart';
 import 'package:PiliPlus/utils/ohos/ohos_native_player.dart';
 import 'package:PiliPlus/utils/ohos/ohos_pip_helper.dart';
 import 'package:PiliPlus/utils/utils.dart';
@@ -803,16 +803,12 @@ class PlPlayerController with BlockConfigMixin {
     assert(_videoPlayerController == null);
     final opt = {
       'video-sync': Pref.videoSync,
+      if (Platform.isAndroid) 'ao': Pref.audioOutput,
+      'volume':
+          (PlatformUtils.isMobile ? Pref.playerVolume : volume.value * 100)
+              .toString(),
+      'volume-max': kMaxVolume.toString(),
     };
-    if (Platform.isAndroid) {
-      opt['ao'] = Pref.audioOutput;
-    }
-    if (PlatformUtils.isMobile) {
-      opt['volume'] = Pref.playerVolume.toString();
-    } else {
-      opt['volume'] = (volume.value * 100).toString();
-    }
-    opt['volume-max'] = kMaxVolume.toString();
     final autosync = Pref.autosync;
     if (autosync != '0') {
       opt['autosync'] = autosync;
@@ -820,9 +816,6 @@ class PlPlayerController with BlockConfigMixin {
 
     final player = await Player.create(
       configuration: PlayerConfiguration(
-        bufferSize: Pref.expandBuffer
-            ? (isLive ? 64 * 1024 * 1024 : 32 * 1024 * 1024)
-            : (isLive ? 16 * 1024 * 1024 : 4 * 1024 * 1024),
         logLevel: kDebugMode ? .warn : .error,
         options: opt,
       ),
@@ -839,16 +832,18 @@ class PlPlayerController with BlockConfigMixin {
       ),
     );
 
-    player.setMediaHeader(
-      userAgent: BrowserUa.pc,
-      referer: HttpString.baseUrl,
-    );
-    // await player.setAudioTrack(.auto());
+    player.setMediaHeader(userAgent: BrowserUa.pc, referer: HttpString.baseUrl);
 
     _startListeners(player);
 
     return player;
   }
+
+  Map<String, String>? _buffer;
+  Map<String, String> get buffer =>
+      _buffer ??= Pref.initBuffer(_playbackSpeed.value);
+  Map<String, String>? _liveBuffer;
+  Map<String, String> get liveBuffer => _liveBuffer ??= Pref.initLiveBuffer();
 
   // 配置播放器
   Future<void> _createVideoController(
@@ -886,6 +881,16 @@ class PlPlayerController with BlockConfigMixin {
     }
 
     final Map<String, String> extras = {};
+
+    if (dataSource is FileSource) {
+      extras['cache'] = 'no';
+    } else {
+      if (isLive) {
+        extras.addAll(liveBuffer);
+      } else {
+        extras.addAll(buffer);
+      }
+    }
 
     String video = dataSource.videoSource;
     if (dataSource.audioSource case final audio? when (audio.isNotEmpty)) {
@@ -1076,11 +1081,8 @@ class PlPlayerController with BlockConfigMixin {
     if (dataSource is FileSource) {
       return null;
     }
-    if (_videoPlayerController?.current.isNotEmpty ?? false) {
-      return _videoPlayerController!.open(
-        _videoPlayerController!.current.last.copyWith(start: position),
-        play: true,
-      );
+    if (_videoPlayerController case final ctr? when (ctr.current.isNotEmpty)) {
+      return ctr.open(ctr.current.last.copyWith(start: position), play: true);
     }
     return null;
   }
@@ -1959,6 +1961,9 @@ class PlPlayerController with BlockConfigMixin {
 
   Future<void> takeScreenshot() async {
     SmartDialog.showToast('截图中');
+    final time = DurationUtils.formatDuration(
+      position.inMilliseconds / 1000,
+    ).replaceAll(':', '-');
     // Vendored media_kit's screenshot() returns Uint8List (not a ui.Image),
     // so display via Image.memory and save the bytes directly.
     final value = await videoPlayerController?.screenshot(format: .png);
@@ -1971,7 +1976,7 @@ class PlPlayerController with BlockConfigMixin {
             Get.back();
             ImageUtils.saveByteImg(
               bytes: value,
-              fileName: 'screenshot_${ImageUtils.time}',
+              fileName: 'screenshot_${cid}_$time',
             );
           },
           child: Align(
@@ -1986,7 +1991,7 @@ class PlPlayerController with BlockConfigMixin {
                   decoration: BoxDecoration(
                     border: Border.all(
                       width: 5,
-                      color: ThemeUtils.theme.colorScheme.surface,
+                      color: ColorScheme.of(context).surface,
                     ),
                   ),
                   child: Padding(
