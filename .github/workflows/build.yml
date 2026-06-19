@@ -17,29 +17,7 @@ on:
                 default: true
                 type: boolean
 
-            build_ios:
-                description: "Build iOS"
-                required: false
-                default: true
-                type: boolean
-
-            build_mac:
-                description: "Build Mac"
-                required: false
-                default: true
-                type: boolean
-
-            build_win_x64:
-                description: "Build Win-x64"
-                required: false
-                default: true
-                type: boolean
-
-            build_linux_x64:
-                description: "Build Linux-x64"
-                required: false
-                default: true
-                type: boolean
+           
 
             tag:
                 description: "tag"
@@ -48,127 +26,191 @@ on:
                 type: string
 
 jobs:
-    android:
-        if: ${{ (github.event_name == 'pull_request' && github.repository == 'bggRGjQaUbCoE/PiliPlus') || github.event.inputs.build_android == 'true' }}
-        name: Release Android
-        runs-on: ubuntu-latest
-        permissions: write-all
+    ohos:
+      if: ${{ (github.event_name == 'pull_request' && github.repository == 'w0scan/PiliOH') || github.event.inputs.build_ohos == 'true' }}
+      name: Release HarmonyOS HAP
+      runs-on: macos-15
+      permissions: write-all
 
-        steps:
-            - name: 代码迁出
-              uses: actions/checkout@v6
-              with:
-                  fetch-depth: 0
+      steps:
+        - name: 代码迁出
+          uses: actions/checkout@v6
+          with:
+            fetch-depth: 0
 
-            - name: 构建Java环境
-              uses: actions/setup-java@v5
-              with:
-                  distribution: "zulu"
-                  java-version: "17"
-                  cache: "gradle"
-                  cache-dependency-path: |
-                      android/*.gradle*
-                      android/**/gradle-wrapper.properties
+        - name: 构建Java环境
+          uses: actions/setup-java@v5
+          with:
+            distribution: "zulu"
+            java-version: "17"
+            cache: "gradle"
+            cache-dependency-path: |
+              ohos/*.gradle*
+              ohos/**/gradle-wrapper.properties
 
-            - name: 安装Flutter
-              uses: subosito/flutter-action@v2
-              id: flutter-action
-              with:
-                  channel: stable
-                  flutter-version-file: pubspec.yaml
-                  cache: true
+        - name: 安装Flutter (鸿蒙版本)
+          id: flutter-action
+          run: |
+            # 克隆鸿蒙 Flutter SDK
+            git clone https://gitcode.com/openharmony-tpc/flutter_flutter.git
+            cd flutter_flutter
+            git checkout 3.41.10-ohos-0.0.1-canary1
+            echo "$(pwd)/bin" >> $GITHUB_PATH
+            echo "FLUTTER_ROOT=$(pwd)" >> $GITHUB_ENV
+            cd ..
+            flutter --version
 
-            - name: Apply Patch
-              shell: pwsh
-              run: lib/scripts/patch.ps1 android
-              continue-on-error: true
+        - name: 缓存Flutter SDK
+          uses: actions/cache@v4
+          with:
+            path: ./flutter_flutter
+            key: ${{ runner.os }}-flutter-ohos-3.41.10-canary1
 
-            - name: Write key
-              if: github.event_name == 'workflow_dispatch'
-              run: |
-                  if [ ! -z "${{ secrets.SIGN_KEYSTORE_BASE64 }}" ]; then
-                    echo "${{ secrets.SIGN_KEYSTORE_BASE64 }}" | base64 --decode > android/app/key.jks
-                    echo storeFile='key.jks' >> android/key.properties
-                    echo storePassword='${{ secrets.KEYSTORE_PASSWORD }}' >> android/key.properties
-                    echo keyAlias='${{ secrets.KEY_ALIAS }}' >> android/key.properties
-                    echo keyPassword='${{ secrets.KEY_PASSWORD }}' >> android/key.properties
-                  fi
+        - name: 缓存Gradle依赖
+          uses: actions/cache@v4
+          with:
+            path: |
+              ~/.gradle/caches
+              ~/.gradle/wrapper
+              ohos/.gradle
+            key: ${{ runner.os }}-ohos-gradle-${{ hashFiles('ohos/**/*.gradle*', 'ohos/**/gradle-wrapper.properties') }}
+            restore-keys: |
+              ${{ runner.os }}-ohos-gradle-
 
-            - name: Set and Extract version
-              if: ${{ github.event_name == 'workflow_dispatch' }}
-              shell: pwsh
-              run: lib/scripts/build.ps1 android
+        - name: 缓存Pub依赖
+          uses: actions/cache@v4
+          with:
+            path: ~/.pub-cache
+            key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
+            restore-keys: |
+              ${{ runner.os }}-pub-
 
-            - name: Flutter Build Release Apk
-              if: ${{ github.event_name == 'workflow_dispatch' }}
-              run: flutter build apk --release --split-per-abi --dart-define-from-file=pili_release.json --pub
+        - name: 获取依赖
+          run: |
+            flutter pub get
 
-            - name: Flutter Build Dev Apk
-              if: ${{ github.event_name == 'pull_request' }}
-              run: |
-                  flutter build apk --release --split-per-abi --android-project-arg dev=1 --pub
+        - name: 配置鸿蒙构建文件
+          run: |
+            
+            
+            # 从示例文件创建配置
+            if [ -f "ohos/build-profile.json5.example" ]; then
+              cp ohos/build-profile.json5.example ohos/build-profile.json5
+              echo "✅ build-profile.json5 创建成功"
+            else
+              echo "❌ build-profile.json5.example 不存在！"
+              echo "📂 ohos目录内容："
+              ls -la ohos/
+              exit 1
+            fi
+            
+            # 确保 gradlew 可执行
+            if [ -f "ohos/gradlew" ]; then
+              chmod +x ohos/gradlew
+              echo "✅ gradlew 已设置可执行权限"
+            fi
 
-            - name: Rename
-              run: |
-                  for file in build/app/outputs/flutter-apk/app-*-release.apk; do
-                    abi=$(echo "$file" | sed -E 's|.*app-(.*)-release\.apk|\1|')
-                    mv "$file" "PiliPlus_android_${{ env.version }}_${abi}.apk"
-                  done
-              shell: bash
+        - name: 应用补丁（如果需要）
+          shell: pwsh
+          run: lib/scripts/patch.ps1 ohos
+          continue-on-error: true
 
-            - name: Release
-              if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '' }}
-              uses: softprops/action-gh-release@v2
-              with:
-                  tag_name: ${{ github.event.inputs.tag }}
-                  name: ${{ github.event.inputs.tag }}
-                  files: PiliPlus_android_*.apk
+       
 
-            - name: 上传
-              uses: actions/upload-artifact@v7
-              with:
-                  archive: false
-                  name: Android_arm64-v8a
-                  path: PiliPlus_android_*_arm64-v8a.apk
+        - name: 设置版本号
+          if: ${{ github.event_name == 'workflow_dispatch' }}
+          shell: pwsh
+          run: lib/scripts/build.ps1 ohos
+          continue-on-error: true
 
-            - name: 上传
-              uses: actions/upload-artifact@v7
-              with:
-                  archive: false
-                  name: Android_armeabi-v7a
-                  path: PiliPlus_android_*_armeabi-v7a.apk
+        - name: Flutter 构建 Release HAP
+          if: ${{ github.event_name == 'workflow_dispatch' }}
+          run: |
+            flutter build hap \
+              --release \
+              --enable-experiment=private-named-parameters \
+              --dart-define-from-file=pili_release.json \
+              --pub
 
-            - name: 上传
-              uses: actions/upload-artifact@v7
-              with:
-                  archive: false
-                  name: Android_x86_64
-                  path: PiliPlus_android_*_x86_64.apk
+        - name: Flutter 构建 Dev HAP
+          if: ${{ github.event_name == 'pull_request' }}
+          run: |
+            flutter build hap \
+              --debug \
+              --enable-experiment=private-named-parameters \
+              --pub
 
-    ios:
-        if: ${{ (github.event_name == 'pull_request' && github.repository == 'bggRGjQaUbCoE/PiliPlus') || github.event.inputs.build_ios == 'true' }}
-        uses: ./.github/workflows/ios.yml
-        permissions: write-all
-        with:
-            tag: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || '' }}
+        - name: 重命名 HAP 文件
+          run: |
+            # 查找生成的 HAP 文件
+            HAP_PATH="ohos/entry/build/default/outputs/default/entry-default-unsigned.hap"
+            
+            if [ -f "$HAP_PATH" ]; then
+              # 获取版本号（从环境变量或文件）
+              VERSION="${VERSION:-$(date +%Y%m%d%H%M)}"
+              
+              # 复制并重命名
+              cp "$HAP_PATH" "PiliPlus_ohos_${VERSION}.hap"
+              
+              # 如果是 signed，处理 signed 版本
+              if [ -f "ohos/entry/build/default/outputs/default/entry-default-signed.hap" ]; then
+                cp "ohos/entry/build/default/outputs/default/entry-default-signed.hap" "PiliPlus_ohos_${VERSION}_signed.hap"
+                echo "✅ 签名版本已重命名"
+              fi
+              
+              echo "✅ HAP 重命名完成"
+              ls -lh PiliPlus_ohos_*.hap
+            else
+              echo "❌ 未找到 HAP 文件！"
+              echo "📂 查找所有 .hap 文件："
+              find . -name "*.hap" -type f 2>/dev/null || echo "未找到 .hap 文件"
+              exit 1
+            fi
+          shell: bash
+          env:
+            VERSION: ${{ env.version }}
 
-    mac:
-        if: ${{ github.event.inputs.build_mac == 'true' }}
-        uses: ./.github/workflows/mac.yml
-        permissions: write-all
-        with:
-            tag: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || '' }}
+        - name: 创建 Release
+          if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '' }}
+          uses: softprops/action-gh-release@v2
+          with:
+            tag_name: ${{ github.event.inputs.tag }}
+            name: ${{ github.event.inputs.tag }}
+            files: PiliPlus_ohos_*.hap
+            draft: ${{ github.event.inputs.draft == 'true' }}
+            prerelease: ${{ github.event.inputs.prerelease == 'true' }}
 
-    win_x64:
-        if: ${{ (github.event_name == 'pull_request' && github.repository == 'bggRGjQaUbCoE/PiliPlus') || github.event.inputs.build_win_x64 == 'true' }}
-        uses: ./.github/workflows/win_x64.yml
-        permissions: write-all
-        with:
-            tag: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || '' }}
+        - name: 上传 HAP (通用)
+          uses: actions/upload-artifact@v7
+          with:
+            archive: false
+            name: HarmonyOS_HAP
+            path: PiliPlus_ohos_*.hap
 
-    linux_x64:
-        if: ${{ github.event.inputs.build_linux_x64 == 'true' }}
-        uses: ./.github/workflows/linux_x64.yml
-        permissions: write-all
-        with:
-            tag: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || '' }}
+        - name: 上传 Unsigned HAP
+          uses: actions/upload-artifact@v7
+          if: always()
+          with:
+            archive: false
+            name: HarmonyOS_HAP_unsigned
+            path: ohos/entry/build/default/outputs/default/entry-default-unsigned.hap
+
+        - name: 上传 Signed HAP
+          uses: actions/upload-artifact@v7
+          if: ${{ github.event_name == 'workflow_dispatch' && secrets.OHOS_SIGN_KEYSTORE_BASE64 != '' }}
+          with:
+            archive: false
+            name: HarmonyOS_HAP_signed
+            path: ohos/entry/build/default/outputs/default/entry-default-signed.hap
+
+        - name: 上传构建日志
+          if: failure()
+          uses: actions/upload-artifact@v7
+          with:
+            archive: false
+            name: ohos-build-logs
+            path: |
+              build/
+              ohos/build-profile.json5
+              *.log
+              flutter_*.log

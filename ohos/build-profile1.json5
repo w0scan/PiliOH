@@ -5,13 +5,13 @@
         "name": "default",
         "type": "HarmonyOS",
         "material": {
-          "certpath": "",
+          "certpath": "/Users/ws/.ohos/config/default_ohos_A6DcOb8CXu7x_cdsTAk3wBfHa1qhEBgosjcL5s81TX8=.cer",
           "keyAlias": "debugKey",
-          "keyPassword": "",
-          "profile": "",
+          "keyPassword": "0000001B747C943F68B1AD511EE725BC1C8812946BAF4EEC86D5BF6324E4ED91BA9A16F648C2E13747B4A9",
+          "profile": "/Users/ws/.ohos/config/default_ohos_A6DcOb8CXu7x_cdsTAk3wBfHa1qhEBgosjcL5s81TX8=.p7b",
           "signAlg": "SHA256withECDSA",
-          "storeFile": "",
-          "storePassword": ""
+          "storeFile": "/Users/ws/.ohos/config/default_ohos_A6DcOb8CXu7x_cdsTAk3wBfHa1qhEBgosjcL5s81TX8=.p12",
+          "storePassword": "0000001B8D97645321DDE8E579943ABA400D0F039BAE8645645FC125733451ACE684BE641AB6323DB9BFA4"
         }
       }
     ],
