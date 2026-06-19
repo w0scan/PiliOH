@@ -21,6 +21,7 @@ import 'package:PiliPlus/pages/fav_panel/view.dart';
 import 'package:PiliPlus/pages/share/view.dart';
 import 'package:PiliPlus/utils/android/android_helper.dart';
 import 'package:PiliPlus/utils/app_scheme.dart';
+import 'package:PiliPlus/utils/ohos/ohos_launcher.dart';
 import 'package:PiliPlus/utils/ohos/ohos_pip_helper.dart';
 import 'package:PiliPlus/utils/extension/context_ext.dart';
 import 'package:PiliPlus/utils/extension/size_ext.dart';
@@ -473,6 +474,14 @@ abstract final class PageUtils {
     LaunchMode mode = LaunchMode.externalApplication,
   }) async {
     try {
+      // url_launcher has no ohos implementation; route through the native
+      // startAbility bridge instead.
+      if (Platform.isOhos) {
+        if (!await OhosLauncher.launchUrl(url)) {
+          SmartDialog.showToast('Could not launch $url');
+        }
+        return;
+      }
       final Uri uri = Uri.parse(url);
       if (!await launchUrl(uri, mode: mode)) {
         SmartDialog.showToast('Could not launch $url');

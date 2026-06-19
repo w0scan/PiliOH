@@ -8,6 +8,7 @@ import {
   MethodResult,
 } from '@ohos/flutter_ohos';
 import window from '@ohos.window';
+import Want from '@ohos.app.ability.Want';
 import { GeneratedPluginRegistrant } from '../plugins/GeneratedPluginRegistrant';
 import MediaKitVideoPlugin from '../plugins/MediaKitVideoPlugin';
 import NativeDualPlayer from '../plugins/NativeDualPlayer';
@@ -124,6 +125,41 @@ export default class EntryAbility extends FlutterAbility {
     filePickerChannel.setMethodCallHandler({
       onMethodCall: (call: MethodCall, result: MethodResult): void => {
         FilePickerOhos.handleCall(call, result);
+      },
+    });
+
+    // url_launcher has no ohos implementation; the Dart side (OhosLauncher)
+    // talks to this channel to open external links via startAbility with the
+    // browsable action (system browser / matching app).
+    const launcherChannel = new MethodChannel(
+      flutterEngine.getDartExecutor(),
+      'piliplus/launcher',
+    );
+    launcherChannel.setMethodCallHandler({
+      onMethodCall: (call: MethodCall, result: MethodResult): void => {
+        switch (call.method) {
+          case 'launchUrl': {
+            const url = call.args as string;
+            if (url === null || url.length === 0) {
+              result.success(false);
+              break;
+            }
+            const want: Want = {
+              action: 'ohos.want.action.viewData',
+              entities: ['entity.system.browsable'],
+              uri: url,
+            };
+            this.context.startAbility(want)
+              .then((): void => result.success(true))
+              .catch((e: Object): void => {
+                Log.e(TAG, 'launchUrl failed: ' + JSON.stringify(e));
+                result.success(false);
+              });
+            break;
+          }
+          default:
+            result.notImplemented();
+        }
       },
     });
   }
