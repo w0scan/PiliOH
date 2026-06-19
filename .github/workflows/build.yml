@@ -220,11 +220,7 @@ jobs:
               # 复制并重命名
               cp "$HAP_PATH" "PiliPlus_ohos_${SUFFIX}.hap"
               
-              # 如果存在签名版本
-              if [ -f "ohos/entry/build/default/outputs/default/entry-default-signed.hap" ]; then
-                cp "ohos/entry/build/default/outputs/default/entry-default-signed.hap" "PiliPlus_ohos_${SUFFIX}_signed.hap"
-                echo "✅ 签名版本已重命名"
-              fi
+             
               
               echo "✅ HAP 重命名完成"
               ls -lh PiliPlus_ohos_*.hap
@@ -254,13 +250,7 @@ jobs:
             name: HarmonyOS_HAP_unsigned_${{ github.sha }}
             path: ohos/entry/build/default/outputs/default/entry-default-unsigned.hap
 
-        - name: 上传 Signed HAP
-          uses: actions/upload-artifact@v7
-          if: ${{ github.event_name == 'workflow_dispatch' && secrets.OHOS_SIGN_KEYSTORE_BASE64 != '' }}
-          with:
-            archive: false
-            name: HarmonyOS_HAP_signed_${{ steps.version.outputs.pili_name || github.sha }}
-            path: ohos/entry/build/default/outputs/default/entry-default-signed.hap
+      
 
         # ============ 创建 Release ============
         - name: 创建 Release
@@ -283,7 +273,7 @@ jobs:
               
               ### 📱 下载说明
               - **未签名版本**: `PiliPlus_ohos_release-*.hap` - 用于调试和开发
-              - **已签名版本**: `PiliPlus_ohos_release-*_signed.hap` - 用于正式安装
+         
               
               ### 🔧 安装方法
               使用 hdc 工具安装：
@@ -291,5 +281,4 @@ jobs:
               # 安装未签名版本
               hdc install PiliPlus_ohos_release-*.hap
               
-              # 或安装已签名版本
-              hdc install PiliPlus_ohos_release-*_signed.hap
+             
