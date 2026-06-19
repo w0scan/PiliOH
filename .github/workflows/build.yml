@@ -235,7 +235,35 @@ jobs:
         - name: 获取依赖
           run: |
             flutter pub get
-
+        - name: 手动创建 ABI 映射
+          run: |
+            FLUTTER_ROOT="$(pwd)/flutter_flutter"
+            DART_SDK="$FLUTTER_ROOT/bin/cache/dart-sdk"
+            
+            # 创建 ohos_arm64 的 ABI 映射文件
+            ABI_FILE="$DART_SDK/lib/abi/ohos_arm64.json"
+            mkdir -p "$(dirname $ABI_FILE)"
+            
+            cat > $ABI_FILE << 'EOF'
+            {
+              "wordSize": 8,
+              "architecture": "arm64",
+              "os": "ohos",
+              "abi": "arm64",
+              "integerSizes": {
+                "char": 1,
+                "short": 2,
+                "int": 4,
+                "long": 8,
+                "longLong": 8,
+                "pointer": 8
+              }
+            }
+            EOF
+            
+            echo "✅ ABI 映射文件创建成功: $ABI_FILE"
+            cat $ABI_FILE
+            
         - name: 配置鸿蒙构建文件
           run: |
            
