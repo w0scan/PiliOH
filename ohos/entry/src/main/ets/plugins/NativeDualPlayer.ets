@@ -66,8 +66,17 @@ export default class NativeDualPlayer implements FlutterPlugin {
   private wantPlay: boolean = false;
   private videoReady: boolean = false;
   private audioReady: boolean = false;
-  private released: boolean = false;
   private lastDriftSeekTs: number = 0;
+
+  // Monotonic id bumped on every setSource/release. Async teardown+setup
+  // continuations capture it and bail if a newer op has superseded them, so a
+  // stale video's events/setup can't touch the current players.
+  private genId: number = 0;
+  // Serializes teardown/setup so a previous video's players are fully released
+  // (audio stopped, fds closed) before the next video's players are created —
+  // otherwise a not-yet-released audio track keeps playing and a stale
+  // timeUpdate drives correctDrift to seek the new video's track (stutter).
+  private pending: Promise<void> = Promise.resolve();
 
   private openedFds: OpenedFile[] = [];
 
@@ -203,12 +212,32 @@ export default class NativeDualPlayer implements FlutterPlugin {
       return;
     }
     this.pendingInit = null;
-    this.resetPlayers()
-      .then((): Promise<void> => this.setupPlayers(init.videoUrl, init.audioUrl))
-      .catch((e: BusinessError): void => {
-        Log.e(TAG, 'setup failed: ' + JSON.stringify(e));
-        this.channel?.invokeMethod('onError', '原生播放器初始化失败: ' + e.message);
+    const gen = ++this.genId;
+    this.runExclusive((): Promise<void> => {
+      if (gen !== this.genId) {
+        return Promise.resolve();
+      }
+      return this.resetPlayers().then((): Promise<void> => {
+        if (gen !== this.genId) {
+          return Promise.resolve();
+        }
+        return this.setupPlayers(init.videoUrl, init.audioUrl);
       });
+    }).catch((e: BusinessError): void => {
+      Log.e(TAG, 'setup failed: ' + JSON.stringify(e));
+      this.channel?.invokeMethod('onError', '原生播放器初始化失败: ' + e.message);
+    });
+  }
+
+  // Chain async teardown/setup so they never interleave on the shared player
+  // fields / fd list. Each op waits for the previous to settle.
+  private runExclusive(op: () => Promise<void>): Promise<void> {
+    const next = this.pending.then(
+      (): Promise<void> => op(),
+      (): Promise<void> => op(),
+    );
+    this.pending = next.catch((): void => {});
+    return next;
   }
 
   private async setupPlayers(
@@ -252,7 +281,9 @@ export default class NativeDualPlayer implements FlutterPlugin {
   // -------------------------------------------------------------------------
   private bindVideoEvents(p: media.AVPlayer): void {
     p.on('stateChange', (state: string): void => {
-      if (this.released) {
+      // Ignore events from a player that's no longer the current one (a stale
+      // video being torn down must not flip ready flags or trigger maybeStart).
+      if (p !== this.videoPlayer) {
         return;
       }
       if (state === 'initialized') {
@@ -279,11 +310,19 @@ export default class NativeDualPlayer implements FlutterPlugin {
     });
 
     p.on('timeUpdate', (ms: number): void => {
+      // A stale video's leftover timeUpdate would drive correctDrift to seek
+      // the CURRENT video's track against an unrelated timeline → stutter.
+      if (p !== this.videoPlayer) {
+        return;
+      }
       this.channel?.invokeMethod('onPosition', ms);
       this.correctDrift(ms);
     });
 
     p.on('durationUpdate', (ms: number): void => {
+      if (p !== this.videoPlayer) {
+        return;
+      }
       this.channel?.invokeMethod('onDuration', ms);
     });
 
@@ -291,6 +330,9 @@ export default class NativeDualPlayer implements FlutterPlugin {
       infoType: media.BufferingInfoType,
       value: number,
     ): void => {
+      if (p !== this.videoPlayer) {
+        return;
+      }
       if (infoType === media.BufferingInfoType.BUFFERING_START) {
         this.channel?.invokeMethod('onBuffering', true);
       } else if (infoType === media.BufferingInfoType.BUFFERING_END) {
@@ -301,6 +343,9 @@ export default class NativeDualPlayer implements FlutterPlugin {
     });
 
     p.on('error', (err: BusinessError): void => {
+      if (p !== this.videoPlayer) {
+        return;
+      }
       Log.e(TAG, 'video error: ' + JSON.stringify(err));
       this.channel?.invokeMethod('onError', '视频轨错误: ' + err.message);
     });
@@ -308,7 +353,7 @@ export default class NativeDualPlayer implements FlutterPlugin {
 
   private bindAudioEvents(p: media.AVPlayer): void {
     p.on('stateChange', (state: string): void => {
-      if (this.released) {
+      if (p !== this.audioPlayer) {
         return;
       }
       if (state === 'initialized') {
@@ -319,6 +364,9 @@ export default class NativeDualPlayer implements FlutterPlugin {
       }
     });
     p.on('error', (err: BusinessError): void => {
+      if (p !== this.audioPlayer) {
+        return;
+      }
       Log.e(TAG, 'audio error: ' + JSON.stringify(err));
       this.channel?.invokeMethod('onError', '音频轨错误: ' + err.message);
     });
@@ -444,7 +492,9 @@ export default class NativeDualPlayer implements FlutterPlugin {
   private releaseAll(): void {
     this.wantPlay = false;
     this.pendingInit = null;
-    this.resetPlayers();
+    // Invalidate any in-flight/queued setup, then tear down after it settles.
+    this.genId++;
+    this.runExclusive((): Promise<void> => this.resetPlayers());
   }
 
   // Convert flutter_ohos's decoded headers (an ES6 Map, or a plain object) into
