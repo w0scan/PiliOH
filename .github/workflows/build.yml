@@ -11,13 +11,13 @@ on:
             - "**.md"
     workflow_dispatch:
         inputs:
-            build_android:
-                description: "Build Android"
-                required: false
-                default: true
-                type: boolean
 
-           
+            # 鸿蒙构建开关
+            build_ohos:
+              description: "Build HarmonyOS"
+              required: false
+              default: true
+              type: boolean
 
             tag:
                 description: "tag"
@@ -27,7 +27,7 @@ on:
 
 jobs:
     ohos:
-      if: ${{ (github.event_name == 'pull_request' && github.repository == 'w0scan/PiliOH') || github.event.inputs.build_ohos == 'true' }}
+      if: ${{ (github.event_name == 'pull_request' && github.repository == 'bggRGjQaUbCoE/PiliPlus') || github.event.inputs.build_ohos == 'true' }}
       name: Release HarmonyOS HAP
       runs-on: macos-15
       permissions: write-all
@@ -51,7 +51,6 @@ jobs:
         - name: 安装Flutter (鸿蒙版本)
           id: flutter-action
           run: |
-            # 克隆鸿蒙 Flutter SDK
             git clone https://gitcode.com/openharmony-tpc/flutter_flutter.git
             cd flutter_flutter
             git checkout 3.41.10-ohos-0.0.1-canary1
@@ -91,37 +90,88 @@ jobs:
 
         - name: 配置鸿蒙构建文件
           run: |
+           
             
-            
-            # 从示例文件创建配置
             if [ -f "ohos/build-profile.json5.example" ]; then
               cp ohos/build-profile.json5.example ohos/build-profile.json5
               echo "✅ build-profile.json5 创建成功"
             else
               echo "❌ build-profile.json5.example 不存在！"
-              echo "📂 ohos目录内容："
               ls -la ohos/
               exit 1
             fi
             
-            # 确保 gradlew 可执行
             if [ -f "ohos/gradlew" ]; then
               chmod +x ohos/gradlew
               echo "✅ gradlew 已设置可执行权限"
             fi
 
-        - name: 应用补丁（如果需要）
+        - name: Apply Patch
           shell: pwsh
           run: lib/scripts/patch.ps1 ohos
           continue-on-error: true
 
        
 
-        - name: 设置版本号
+        # ============ 关键步骤：生成 pili_release.json 并提取版本信息 ============
+        - name: 设置版本号并提取信息
           if: ${{ github.event_name == 'workflow_dispatch' }}
+          id: version
           shell: pwsh
-          run: lib/scripts/build.ps1 ohos
-          continue-on-error: true
+          run: |
+            # 执行构建脚本，生成 pili_release.json
+            lib/scripts/build.ps1 ohos
+            
+            # 读取 pili_release.json 内容
+            $json = Get-Content -Path "pili_release.json" -Raw | ConvertFrom-Json
+            
+            # 提取版本信息
+            $piliName = $json.'pili.name'
+            $piliCode = $json.'pili.code'
+            $piliHash = $json.'pili.hash'
+            $piliTime = $json.'pili.time'
+            
+            # 输出到环境变量
+            echo "pili_name=$piliName" >> $env:GITHUB_ENV
+            echo "pili_code=$piliCode" >> $env:GITHUB_ENV
+            echo "pili_hash=$piliHash" >> $env:GITHUB_ENV
+            echo "pili_time=$piliTime" >> $env:GITHUB_ENV
+            
+            # 输出到步骤输出
+            echo "pili_name=$piliName" >> $env:GITHUB_OUTPUT
+            echo "pili_code=$piliCode" >> $env:GITHUB_OUTPUT
+            echo "pili_hash=$piliHash" >> $env:GITHUB_OUTPUT
+            echo "pili_time=$piliTime" >> $env:GITHUB_OUTPUT
+            
+            # 生成 Tag
+            $tag = ${{ github.event.inputs.tag }}
+            if ([string]::IsNullOrEmpty($tag)) {
+              # 自动生成 Tag
+              $tag = "v${piliName}-${piliTime}"
+            }
+            echo "tag=$tag" >> $env:GITHUB_OUTPUT
+            echo "TAG=$tag" >> $env:GITHUB_ENV
+            
+            Write-Host "📝 版本信息："
+            Write-Host "  pili.name: $piliName"
+            Write-Host "  pili.code: $piliCode"
+            Write-Host "  pili.hash: $piliHash"
+            Write-Host "  pili.time: $piliTime"
+            Write-Host "  tag: $tag"
+
+        # ============ 显示 pili_release.json 内容（调试用） ============
+        - name: 显示 pili_release.json
+          if: ${{ github.event_name == 'workflow_dispatch' }}
+          run: |
+            echo "📄 pili_release.json 内容："
+            cat pili_release.json
+            echo ""
+            echo "📝 提取的版本信息："
+            echo "  pili.name: ${{ steps.version.outputs.pili_name }}"
+            echo "  pili.code: ${{ steps.version.outputs.pili_code }}"
+            echo "  pili.hash: ${{ steps.version.outputs.pili_hash }}"
+            echo "  pili.time: ${{ steps.version.outputs.pili_time }}"
+            echo "  tag: ${{ steps.version.outputs.tag }}"
 
         - name: Flutter 构建 Release HAP
           if: ${{ github.event_name == 'workflow_dispatch' }}
@@ -140,21 +190,39 @@ jobs:
               --enable-experiment=private-named-parameters \
               --pub
 
+        # ============ 重命名 HAP 文件（使用 pili_release.json 中的版本） ============
         - name: 重命名 HAP 文件
           run: |
-            # 查找生成的 HAP 文件
             HAP_PATH="ohos/entry/build/default/outputs/default/entry-default-unsigned.hap"
             
             if [ -f "$HAP_PATH" ]; then
-              # 获取版本号（从环境变量或文件）
-              VERSION="${VERSION:-$(date +%Y%m%d%H%M)}"
+              # 使用从 pili_release.json 提取的版本信息
+              if [ "${{ github.event_name }}" == "pull_request" ]; then
+                # PR 构建使用 commit hash
+                SUFFIX="dev-$(git rev-parse --short HEAD)"
+              else
+                # Release 构建使用 pili_release.json 中的版本
+                PILI_NAME="${{ steps.version.outputs.pili_name }}"
+                PILI_CODE="${{ steps.version.outputs.pili_code }}"
+                PILI_TIME="${{ steps.version.outputs.pili_time }}"
+                
+                # 如果版本信息为空，使用默认值
+                if [ -z "$PILI_NAME" ]; then
+                  PILI_NAME="unknown"
+                fi
+                if [ -z "$PILI_TIME" ]; then
+                  PILI_TIME=$(date +%s)
+                fi
+                
+                SUFFIX="release-${PILI_NAME}-${PILI_TIME}"
+              fi
               
               # 复制并重命名
-              cp "$HAP_PATH" "PiliPlus_ohos_${VERSION}.hap"
+              cp "$HAP_PATH" "PiliPlus_ohos_${SUFFIX}.hap"
               
-              # 如果是 signed，处理 signed 版本
+              # 如果存在签名版本
               if [ -f "ohos/entry/build/default/outputs/default/entry-default-signed.hap" ]; then
-                cp "ohos/entry/build/default/outputs/default/entry-default-signed.hap" "PiliPlus_ohos_${VERSION}_signed.hap"
+                cp "ohos/entry/build/default/outputs/default/entry-default-signed.hap" "PiliPlus_ohos_${SUFFIX}_signed.hap"
                 echo "✅ 签名版本已重命名"
               fi
               
@@ -168,23 +236,14 @@ jobs:
             fi
           shell: bash
           env:
-            VERSION: ${{ env.version }}
+            VERSION: ${{ steps.version.outputs.pili_name }}
 
-        - name: 创建 Release
-          if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '' }}
-          uses: softprops/action-gh-release@v2
-          with:
-            tag_name: ${{ github.event.inputs.tag }}
-            name: ${{ github.event.inputs.tag }}
-            files: PiliPlus_ohos_*.hap
-            draft: ${{ github.event.inputs.draft == 'true' }}
-            prerelease: ${{ github.event.inputs.prerelease == 'true' }}
-
-        - name: 上传 HAP (通用)
+        # ============ 上传 Artifacts ============
+        - name: 上传 HAP
           uses: actions/upload-artifact@v7
           with:
             archive: false
-            name: HarmonyOS_HAP
+            name: HarmonyOS_HAP_${{ steps.version.outputs.pili_name || github.sha }}
             path: PiliPlus_ohos_*.hap
 
         - name: 上传 Unsigned HAP
@@ -192,18 +251,45 @@ jobs:
           if: always()
           with:
             archive: false
-            name: HarmonyOS_HAP_unsigned
+            name: HarmonyOS_HAP_unsigned_${{ github.sha }}
             path: ohos/entry/build/default/outputs/default/entry-default-unsigned.hap
 
-       
-        - name: 上传构建日志
-          if: failure()
+        - name: 上传 Signed HAP
           uses: actions/upload-artifact@v7
+          if: ${{ github.event_name == 'workflow_dispatch' && secrets.OHOS_SIGN_KEYSTORE_BASE64 != '' }}
           with:
             archive: false
-            name: ohos-build-logs
-            path: |
-              build/
-              ohos/build-profile.json5
-              *.log
-              flutter_*.log
+            name: HarmonyOS_HAP_signed_${{ steps.version.outputs.pili_name || github.sha }}
+            path: ohos/entry/build/default/outputs/default/entry-default-signed.hap
+
+        # ============ 创建 Release ============
+        - name: 创建 Release
+          if: ${{ github.event_name == 'workflow_dispatch' }}
+          uses: softprops/action-gh-release@v2
+          with:
+            tag_name: ${{ steps.version.outputs.tag }}
+            name: "PiliPlus v${{ steps.version.outputs.pili_name }}"
+            body: |
+              ## 📦 HarmonyOS HAP Release
+              
+              ### 版本信息
+              - **应用名称**: PiliPlus
+              - **版本号**: ${{ steps.version.outputs.pili_name }}
+              - **版本代码**: ${{ steps.version.outputs.pili_code }}
+              - **Commit Hash**: ${{ steps.version.outputs.pili_hash }}
+              - **构建时间戳**: ${{ steps.version.outputs.pili_time }}
+              - **Tag**: ${{ steps.version.outputs.tag }}
+              - **Git Commit**: ${{ github.sha }}
+              
+              ### 📱 下载说明
+              - **未签名版本**: `PiliPlus_ohos_release-*.hap` - 用于调试和开发
+              - **已签名版本**: `PiliPlus_ohos_release-*_signed.hap` - 用于正式安装
+              
+              ### 🔧 安装方法
+              使用 hdc 工具安装：
+              ```bash
+              # 安装未签名版本
+              hdc install PiliPlus_ohos_release-*.hap
+              
+              # 或安装已签名版本
+              hdc install PiliPlus_ohos_release-*_signed.hap
