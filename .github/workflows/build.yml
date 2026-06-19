@@ -77,7 +77,7 @@ jobs:
             # ✅ 现在可以立即使用 flutter 命令了
             echo "📂 Flutter SDK 路径: $FLUTTER_ROOT"
             flutter --version
-            echo $(flutter doctor)
+            flutter doctor -v
 
        
 
