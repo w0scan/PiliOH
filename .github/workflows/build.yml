@@ -46,15 +46,15 @@ jobs:
             java-version: "17"
             cache: "gradle"
 
-        - name: 缓存 Flutter SDK + 引擎（完整缓存）
-          uses: actions/cache@v4
-          with:
-            path: |
-              ./flutter_flutter
-              ~/.pub-cache
-            key: ${{ runner.os }}-flutter-ohos-full-v1-${{ hashFiles('pubspec.lock') }}
-            restore-keys: |
-              ${{ runner.os }}-flutter-ohos-full-v1-
+        # - name: 缓存 Flutter SDK + 引擎（完整缓存）
+        #   uses: actions/cache@v4
+        #   with:
+        #     path: |
+        #       ./flutter_flutter
+        #       ~/.pub-cache
+        #     key: ${{ runner.os }}-flutter-ohos-full-v1-${{ hashFiles('pubspec.lock') }}
+        #     restore-keys: |
+        #       ${{ runner.os }}-flutter-ohos-full-v1-
 
         - name: 安装Flutter (鸿蒙版本)
           id: flutter-action
@@ -263,7 +263,7 @@ jobs:
             
             echo "✅ ABI 映射文件创建成功: $ABI_FILE"
             cat $ABI_FILE
-            
+
         - name: 配置鸿蒙构建文件
           run: |
            
