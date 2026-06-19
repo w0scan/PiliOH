@@ -56,23 +56,26 @@ jobs:
         - name: 安装Flutter (鸿蒙版本)
           id: flutter-action
           run: |
-            # 检查缓存是否恢复成功
+            # 检查缓存是否恢复
             if [ -d "./flutter_flutter" ] && [ -f "./flutter_flutter/bin/flutter" ]; then
               echo "✅ 使用缓存的 Flutter SDK"
             else
-              echo "🔄 下载 Flutter SDK..."
+              echo "🔄 缓存未命中，下载 Flutter SDK..."
               rm -rf ./flutter_flutter
               git clone --depth 1 --branch 3.41.10-ohos-0.0.1-canary1 \
                 https://gitcode.com/openharmony-tpc/flutter_flutter.git
             fi
             
-            # ✅ 关键：先配置 PATH，再运行 flutter 命令
-            echo "📂 配置 Flutter 环境..."
+            # ✅ 方法1：在当前 shell 中立即更新 PATH
+            export PATH="$PATH:$(pwd)/flutter_flutter/bin"
+            export FLUTTER_ROOT="$(pwd)/flutter_flutter"
+            
+            # 同时也写入 GITHUB_PATH 和 GITHUB_ENV 供后续步骤使用
             echo "$(pwd)/flutter_flutter/bin" >> $GITHUB_PATH
             echo "FLUTTER_ROOT=$(pwd)/flutter_flutter" >> $GITHUB_ENV
             
-            # ✅ 现在 PATH 已经更新，可以运行 flutter 命令了
-            echo "✅ Flutter 环境配置完成"
+            # ✅ 现在可以立即使用 flutter 命令了
+            echo "📂 Flutter SDK 路径: $FLUTTER_ROOT"
             flutter --version
 
        
