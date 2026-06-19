@@ -1153,29 +1153,26 @@ packages:
   media_kit_libs_video:
     dependency: "direct main"
     description:
-      path: "libs/universal/media_kit_libs_video"
-      ref: "version_1.2.5"
-      resolved-ref: "4f0f72e5bf21349bc251bf52761628faeae3f233"
-      url: "https://github.com/My-Responsitories/media-kit.git"
-    source: git
+      name: media_kit_libs_video
+      sha256: "20bb4aefa8fece282b59580e1cd8528117297083a6640c98c2e98cfc96b93288"
+      url: "https://pub.flutter-io.cn"
+    source: hosted
     version: "1.0.5"
   media_kit_libs_windows_video:
-    dependency: "direct overridden"
+    dependency: transitive
     description:
-      path: "libs/windows/media_kit_libs_windows_video"
-      ref: "version_1.2.5"
-      resolved-ref: "4f0f72e5bf21349bc251bf52761628faeae3f233"
-      url: "https://github.com/My-Responsitories/media-kit.git"
-    source: git
-    version: "1.0.10"
+      name: media_kit_libs_windows_video
+      sha256: dff76da2778729ab650229e6b4ec6ec111eb5151431002cbd7ea304ff1f112ab
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "1.0.11"
   media_kit_native_event_loop:
-    dependency: "direct overridden"
+    dependency: transitive
     description:
-      path: media_kit_native_event_loop
-      ref: "version_1.2.5"
-      resolved-ref: "4f0f72e5bf21349bc251bf52761628faeae3f233"
-      url: "https://github.com/My-Responsitories/media-kit.git"
-    source: git
+      name: media_kit_native_event_loop
+      sha256: "7d82e3b3e9ded5c35c3146c5ba1da3118d1dd8ac3435bac7f29f458181471b40"
+      url: "https://pub.flutter-io.cn"
+    source: hosted
     version: "1.0.9"
   media_kit_video:
     dependency: "direct main"
