@@ -91,6 +91,107 @@ jobs:
             restore-keys: |
               ${{ runner.os }}-ohos-gradle-
 
+        - name: 下载并配置鸿蒙命令行工具
+          id: setup-ohos
+          run: |
+            # 1. 定义 SDK 路径
+            OHOS_SDK_PATH="$HOME/ohos-sdk"
+            mkdir -p "$OHOS_SDK_PATH"
+            
+            # 2. 检查缓存是否已存在
+            if [ -d "$OHOS_SDK_PATH/command-line-tools" ] && [ -f "$OHOS_SDK_PATH/command-line-tools/bin/hvigorw" ]; then
+              echo "✅ 使用缓存的 Command Line Tools"
+            else
+              echo "🔄 下载 Command Line Tools (约 1.9GB) ..."
+              # 清理可能不完整的目录
+              rm -rf "$OHOS_SDK_PATH/command-line-tools"
+              
+              # 下载
+              CLI_TOOL_URL="https://contentcenter-vali-drcn.dbankcdn.cn/pvt_2/DeveloperAlliance_package_901_9/5c/v3/MfVuro7qRrq3ndvYmI0vGw/commandline-tools-mac-arm64-6.1.1.280.zip?HW-CC-KV=V1&HW-CC-Date=20260619T113720Z&HW-CC-Expire=315360000&HW-CC-Sign=E9CDD5C7E82467EDD44A97259749B476D092FBBC7C81081CDD0A66AFA2367CF5"
+              
+              curl -L -o /tmp/commandline-tools.zip "$CLI_TOOL_URL"
+              
+              # 检查下载是否成功
+              if [ ! -f "/tmp/commandline-tools.zip" ] || [ $(stat -f%z /tmp/commandline-tools.zip) -lt 1000000 ]; then
+                echo "❌ 下载失败或文件不完整"
+                exit 1
+              fi
+              
+              # 解压
+              echo "📦 解压中..."
+              unzip -q /tmp/commandline-tools.zip -d "$OHOS_SDK_PATH/"
+              rm /tmp/commandline-tools.zip
+              
+              # 检查解压后的目录结构并修正
+              if [ -d "$OHOS_SDK_PATH/command-line-tools" ]; then
+                echo "✅ 解压成功"
+              elif [ -d "$OHOS_SDK_PATH/commandline-tools-mac-arm64-6.1.1.280" ]; then
+                # 如果解压出的是带版本号的目录，重命名
+                mv "$OHOS_SDK_PATH/commandline-tools-mac-arm64-6.1.1.280" "$OHOS_SDK_PATH/command-line-tools"
+                echo "✅ 目录重命名成功"
+              else
+                # 查找实际解压出来的目录
+                EXTRACTED_DIR=$(find "$OHOS_SDK_PATH" -maxdepth 1 -type d -name "commandline*" | head -1)
+                if [ -n "$EXTRACTED_DIR" ] && [ "$EXTRACTED_DIR" != "$OHOS_SDK_PATH" ]; then
+                  mv "$EXTRACTED_DIR" "$OHOS_SDK_PATH/command-line-tools"
+                  echo "✅ 目录修正成功"
+                else
+                  echo "❌ 解压失败，找不到 command-line-tools 目录"
+                  ls -la "$OHOS_SDK_PATH"
+                  exit 1
+                fi
+              fi
+            fi
+            
+            # 3. 设置环境变量
+            CLI_HOME="$OHOS_SDK_PATH/command-line-tools"
+            
+            # 验证关键目录存在
+            if [ ! -d "$CLI_HOME/sdk/default/openharmony" ]; then
+              echo "❌ SDK 目录结构不完整"
+              echo "📂 实际目录结构："
+              find "$CLI_HOME" -maxdepth 3 -type d | head -20
+              exit 1
+            fi
+            
+            # 设置 HOS_SDK_HOME (Flutter 构建需要)
+            echo "HOS_SDK_HOME=$CLI_HOME/sdk/default/openharmony" >> $GITHUB_ENV
+            
+            # 添加到 PATH
+            echo "$CLI_HOME/bin" >> $GITHUB_PATH
+            echo "$CLI_HOME/sdk/default/openharmony/toolchains" >> $GITHUB_PATH
+            
+            # 配置 ohpm
+            if [ -f "$CLI_HOME/bin/ohpm" ]; then
+              $CLI_HOME/bin/ohpm config set registry https://ohpm.openharmony.cn/ohpm/ 2>/dev/null || true
+              $CLI_HOME/bin/ohpm config set strict_ssl false 2>/dev/null || true
+            fi
+            
+            # 验证安装
+            echo "✅ 验证工具链："
+            if [ -f "$CLI_HOME/bin/hvigorw" ]; then
+              echo "  ✅ hvigorw 可用"
+              $CLI_HOME/bin/hvigorw -v 2>/dev/null | head -1 || echo "  ⚠️ hvigorw 版本获取失败"
+            fi
+            if [ -f "$CLI_HOME/bin/ohpm" ]; then
+              echo "  ✅ ohpm 可用"
+              $CLI_HOME/bin/ohpm -v 2>/dev/null | head -1 || echo "  ⚠️ ohpm 版本获取失败"
+            fi
+            if [ -f "$CLI_HOME/sdk/default/openharmony/toolchains/hdc" ]; then
+              echo "  ✅ hdc 可用"
+            fi
+            
+            # 显示 SDK 大小
+            echo "📦 SDK 大小: $(du -sh $OHOS_SDK_PATH | cut -f1)"
+
+        # 4. 缓存配置 (放在 setup 步骤之后)
+        - name: 缓存鸿蒙命令行工具
+          uses: actions/cache@v4
+          with:
+            path: ~/ohos-sdk
+            key: ${{ runner.os }}-ohos-sdk-v1
+            restore-keys: |
+              ${{ runner.os }}-ohos-sdk-
         - name: 缓存Pub依赖
           uses: actions/cache@v4
           with:
