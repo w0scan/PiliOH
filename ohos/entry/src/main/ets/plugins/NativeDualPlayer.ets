@@ -57,6 +57,10 @@ export default class NativeDualPlayer implements FlutterPlugin {
   private startMs: number = 0;
   private startSeekDone: boolean = true;
   private speed: number = 1.0;
+  // Last speed actually pushed to the AVPlayers; -1 = never applied.
+  // Lets applySpeed() push 1.0 to restore from long-press 2x while still
+  // skipping redundant re-applies of an unchanged speed.
+  private appliedSpeed: number = -1;
   private headers: Record<string, string> = {};
 
   private wantPlay: boolean = false;
@@ -346,13 +350,19 @@ export default class NativeDualPlayer implements FlutterPlugin {
   }
 
   private applySpeed(): void {
-    if (!(this.videoReady && this.audioReady) || this.speed == 1.0) {
+    // setSpeed is only valid once both tracks are prepared; maybeStart()
+    // re-invokes applySpeed() after prepare so the pending speed still lands.
+    if (!(this.videoReady && this.audioReady)) {
+      return;
+    }
+    if (this.speed == this.appliedSpeed) {
       return;
     }
     const s = NativeDualPlayer.toPlaybackSpeed(this.speed);
     try {
       this.videoPlayer?.setSpeed(s);
       this.audioPlayer?.setSpeed(s);
+      this.appliedSpeed = this.speed;
     } catch (e) {
       Log.e(TAG, 'setSpeed failed: ' + JSON.stringify(e));
     }
@@ -389,6 +399,9 @@ export default class NativeDualPlayer implements FlutterPlugin {
   private async resetPlayers(): Promise<void> {
     this.videoReady = false;
     this.audioReady = false;
+    // Fresh AVPlayers start at 1.0x; force re-apply of the desired speed once
+    // the new tracks are prepared.
+    this.appliedSpeed = -1;
     const v = this.videoPlayer;
     const a = this.audioPlayer;
     this.videoPlayer = null;
