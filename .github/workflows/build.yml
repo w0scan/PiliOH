@@ -46,22 +46,36 @@ jobs:
             java-version: "17"
             cache: "gradle"
 
-        - name: 安装Flutter (鸿蒙版本)
-          id: flutter-action
-          run: |
-            git clone https://gitcode.com/openharmony-tpc/flutter_flutter.git
-            cd flutter_flutter
-            git checkout 3.41.10-ohos-0.0.1-canary1
-            echo "$(pwd)/bin" >> $GITHUB_PATH
-            echo "FLUTTER_ROOT=$(pwd)" >> $GITHUB_ENV
-            cd ..
-            flutter --version
-
         - name: 缓存Flutter SDK
+          id: cache-flutter
           uses: actions/cache@v4
           with:
             path: ./flutter_flutter
             key: ${{ runner.os }}-flutter-ohos-3.41.10-canary1
+
+        - name: 安装Flutter (鸿蒙版本)
+          id: flutter-action
+          run: |
+            # 检查缓存是否恢复成功
+            if [ -d "./flutter_flutter" ] && [ -f "./flutter_flutter/bin/flutter" ]; then
+              echo "✅ 使用缓存的 Flutter SDK"
+            else
+              echo "🔄 下载 Flutter SDK..."
+              rm -rf ./flutter_flutter
+              git clone --depth 1 --branch 3.41.10-ohos-0.0.1-canary1 \
+                https://gitcode.com/openharmony-tpc/flutter_flutter.git
+            fi
+            
+            # ✅ 关键：先配置 PATH，再运行 flutter 命令
+            echo "📂 配置 Flutter 环境..."
+            echo "$(pwd)/flutter_flutter/bin" >> $GITHUB_PATH
+            echo "FLUTTER_ROOT=$(pwd)/flutter_flutter" >> $GITHUB_ENV
+            
+            # ✅ 现在 PATH 已经更新，可以运行 flutter 命令了
+            echo "✅ Flutter 环境配置完成"
+            flutter --version
+
+       
 
         - name: 缓存Gradle依赖
           uses: actions/cache@v4
