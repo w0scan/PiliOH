@@ -46,38 +46,67 @@ jobs:
             java-version: "17"
             cache: "gradle"
 
-        - name: 缓存Flutter SDK
-          id: cache-flutter
+        - name: 缓存 Flutter SDK + 引擎（完整缓存）
           uses: actions/cache@v4
           with:
-            path: ./flutter_flutter
-            key: ${{ runner.os }}-flutter-ohos-3.41.10-canary1
+            path: |
+              ./flutter_flutter
+              ~/.pub-cache
+            key: ${{ runner.os }}-flutter-ohos-full-v1-${{ hashFiles('pubspec.lock') }}
+            restore-keys: |
+              ${{ runner.os }}-flutter-ohos-full-v1-
 
         - name: 安装Flutter (鸿蒙版本)
           id: flutter-action
           run: |
-            # 检查缓存是否恢复
             if [ -d "./flutter_flutter" ] && [ -f "./flutter_flutter/bin/flutter" ]; then
               echo "✅ 使用缓存的 Flutter SDK"
+              cd flutter_flutter
+              git fetch --tags
+              git checkout cedbd616b9  # 锁定到与本地相同的 commit
+              cd ..
             else
-              echo "🔄 缓存未命中，下载 Flutter SDK..."
+              echo "🔄 下载 Flutter SDK..."
               rm -rf ./flutter_flutter
               git clone --depth 1 --branch 3.41.10-ohos-0.0.1-canary1 \
                 https://gitcode.com/openharmony-tpc/flutter_flutter.git
+              cd flutter_flutter
+              git checkout cedbd616b9
+              cd ..
             fi
             
-            # ✅ 方法1：在当前 shell 中立即更新 PATH
-            export PATH="$PATH:$(pwd)/flutter_flutter/bin"
-            export FLUTTER_ROOT="$(pwd)/flutter_flutter"
+            FLUTTER_ROOT="$(pwd)/flutter_flutter"
+            echo "FLUTTER_ROOT=$FLUTTER_ROOT" >> $GITHUB_ENV
+            echo "$FLUTTER_ROOT/bin" >> $GITHUB_PATH
             
-            # 同时也写入 GITHUB_PATH 和 GITHUB_ENV 供后续步骤使用
-            echo "$(pwd)/flutter_flutter/bin" >> $GITHUB_PATH
-            echo "FLUTTER_ROOT=$(pwd)/flutter_flutter" >> $GITHUB_ENV
+            # 启用 ohos 支持
+            $FLUTTER_ROOT/bin/flutter config --enable-ohos
             
-            # ✅ 现在可以立即使用 flutter 命令了
-            echo "📂 Flutter SDK 路径: $FLUTTER_ROOT"
-            flutter --version
-            flutter doctor -v
+            # ⭐ 关键：预下载所有需要的引擎（包括 ohos-arm64）
+            echo "🔄 预下载鸿蒙引擎..."
+            $FLUTTER_ROOT/bin/flutter precache --ohos
+            $FLUTTER_ROOT/bin/flutter precache
+            
+            # 验证引擎下载完成
+            echo "📂 引擎目录："
+            ls -la $FLUTTER_ROOT/bin/cache/artifacts/engine/
+            
+            # 检查 ohos-arm64 是否存在
+            if [ -d "$FLUTTER_ROOT/bin/cache/artifacts/engine/ohos-arm64" ]; then
+              echo "✅ ohos-arm64 引擎下载成功"
+              ls -la $FLUTTER_ROOT/bin/cache/artifacts/engine/ohos-arm64/
+            else
+              echo "❌ ohos-arm64 引擎下载失败"
+              echo "📂 尝试手动下载..."
+              $FLUTTER_ROOT/bin/flutter precache --ohos --verbose
+              exit 1
+            fi
+            
+            echo "📦 缓存总大小："
+            du -sh $FLUTTER_ROOT/bin/cache/
+            
+            $FLUTTER_ROOT/bin/flutter --version
+
 
        
 
