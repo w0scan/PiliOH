@@ -195,14 +195,7 @@ jobs:
             name: HarmonyOS_HAP_unsigned
             path: ohos/entry/build/default/outputs/default/entry-default-unsigned.hap
 
-        - name: 上传 Signed HAP
-          uses: actions/upload-artifact@v7
-          if: ${{ github.event_name == 'workflow_dispatch' && secrets.OHOS_SIGN_KEYSTORE_BASE64 != '' }}
-          with:
-            archive: false
-            name: HarmonyOS_HAP_signed
-            path: ohos/entry/build/default/outputs/default/entry-default-signed.hap
-
+       
         - name: 上传构建日志
           if: failure()
           uses: actions/upload-artifact@v7
