@@ -240,6 +240,7 @@ abstract final class PageUtils {
   static Future<void> pushDynDetail(
     DynamicItemModel item, {
     bool isPush = false,
+    bool viewComment = false,
   }) async {
     feedBack();
 
@@ -261,6 +262,7 @@ abstract final class PageUtils {
           '/dynamicDetail',
           arguments: {
             'item': item,
+            if (viewComment) 'viewComment': true,
           },
         );
       }
