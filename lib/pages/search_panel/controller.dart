@@ -72,7 +72,9 @@ class SearchPanelController<R extends SearchNumData<T>, T>
           scrollController.animToTop();
         }
       });
-    } catch (_) {}
+    } catch (_) {
+      // SearchResultController may not be registered yet
+    }
     queryData();
   }
 

@@ -20,7 +20,9 @@ abstract class CommonPageState<T extends StatefulWidget> extends State<T> {
     _showBottomBar = _mainController.showBottomBar;
     try {
       _showTopBar = Get.find<HomeController>().showTopBar;
-    } catch (_) {}
+    } catch (_) {
+      // HomeController may not be registered on non-home pages
+    }
   }
 
   Widget onBuild(Widget child) {

@@ -100,7 +100,11 @@ class DownloadService extends GetxService {
             } else {
               waitDownloadQueue.add(entry..status = DownloadStatus.wait);
             }
-          } catch (_) {}
+          } catch (e) {
+            if (kDebugMode) {
+              debugPrint('Failed to read download entry: ${entryFile.path}: $e');
+            }
+          }
         }
       }
     }

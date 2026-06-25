@@ -278,7 +278,9 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
             _onVolumeChanged,
             emitOnStart: false,
           );
-        } catch (_) {}
+        } catch (e) {
+          if (kDebugMode) debugPrint('Volume controller init failed: $e');
+        }
 
         try {
           if (Platform.isIOS || plPlayerController.setSystemBrightness) {
@@ -294,7 +296,9 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
                 .onApplicationScreenBrightnessChanged
                 .listen(_onBrightnessChanged);
           }
-        } catch (_) {}
+        } catch (e) {
+          if (kDebugMode) debugPrint('Brightness listener init failed: $e');
+        }
       });
     }
 
@@ -363,7 +367,9 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
           value,
         );
       }
-    } catch (_) {}
+    } catch (e) {
+      if (kDebugMode) debugPrint('setBrightness failed: $e');
+    }
     _brightnessIndicator.value = true;
     _brightnessTimer?.cancel();
     _brightnessTimer = Timer(const Duration(milliseconds: 200), () {

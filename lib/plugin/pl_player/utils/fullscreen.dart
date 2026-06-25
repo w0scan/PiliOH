@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:PiliPlus/utils/device_utils.dart';
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import 'package:flutter/services.dart'
     show SystemChrome, MethodChannel, SystemUiOverlay, DeviceOrientation;
 
@@ -15,7 +16,9 @@ Future<void> enterDesktopFullScreen({bool inAppFullScreen = false}) async {
       await const MethodChannel(
         'com.alexmercerind/media_kit_video',
       ).invokeMethod('Utils.EnterNativeFullscreen');
-    } catch (_) {}
+    } catch (e) {
+      if (kDebugMode) debugPrint('enterDesktopFullScreen failed: $e');
+    }
   }
 }
 
@@ -27,7 +30,9 @@ Future<void> exitDesktopFullScreen() async {
       await const MethodChannel(
         'com.alexmercerind/media_kit_video',
       ).invokeMethod('Utils.ExitNativeFullscreen');
-    } catch (_) {}
+    } catch (e) {
+      if (kDebugMode) debugPrint('exitDesktopFullScreen failed: $e');
+    }
   }
 }
 

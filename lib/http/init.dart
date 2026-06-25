@@ -97,7 +97,10 @@ class Request {
           contentType: Headers.jsonContentType,
         ),
       );
-    } catch (_) {}
+    } catch (e) {
+      account.activated = false;
+      if (kDebugMode) debugPrint('buvidActive failed: $e');
+    }
   }
 
   static Dio _cloneHttp11Dio() {
@@ -192,7 +195,9 @@ class Request {
           ..httpClientAdapter.close(force: true)
           ..httpClientAdapter = h11;
       }
-    } catch (_) {}
+    } catch (e, s) {
+      if (kDebugMode) debugPrint('resetAdapters failed: $e\n$s');
+    }
   }
 
   /*

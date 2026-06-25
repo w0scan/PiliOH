@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:PiliPlus/common/constants.dart';
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import 'package:PiliPlus/common/widgets/pair.dart';
 import 'package:PiliPlus/utils/device_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
@@ -68,7 +69,9 @@ class WebDav {
       final path = '$_webdavDirectory/$_fileName';
       try {
         await _client!.remove(path);
-      } catch (_) {}
+      } catch (e) {
+        if (kDebugMode) debugPrint('WebDAV remove old backup failed: $e');
+      }
       await _client!.write(path, utf8.encode(data));
       SmartDialog.showToast('备份成功');
     } catch (e) {

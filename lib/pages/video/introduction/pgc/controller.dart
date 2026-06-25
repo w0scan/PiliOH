@@ -296,7 +296,9 @@ class PgcIntroController extends CommonIntroController {
           if (replyCtr.loadingState.value is! Loading) {
             replyCtr.onReload();
           }
-        } catch (_) {}
+        } catch (_) {
+          // VideoReplyController may not be registered
+        }
       }
 
       if (isPgc && isLogin) {

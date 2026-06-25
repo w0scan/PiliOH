@@ -1366,7 +1366,9 @@ class PlPlayerController with BlockConfigMixin {
           staticDuration: defaultStaticDuration / speed,
         );
         danmakuController!.updateOption(updatedOption);
-      } catch (_) {}
+      } catch (e) {
+        if (kDebugMode) debugPrint('Failed to update danmaku speed: $e');
+      }
     }
   }
 
