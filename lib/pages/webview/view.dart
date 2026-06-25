@@ -179,7 +179,7 @@ class _WebviewPageState extends State<WebviewPage> {
             algorithmicDarkeningAllowed: true,
             useShouldOverrideUrlLoading: true,
             userAgent: userAgent,
-            mixedContentMode: MixedContentMode.MIXED_CONTENT_ALWAYS_ALLOW,
+            mixedContentMode: MixedContentMode.MIXED_CONTENT_NEVER_ALLOW,
           ),
           initialUrlRequest: URLRequest(
             url: WebUri.uri(Uri.tryParse(_url) ?? Uri()),

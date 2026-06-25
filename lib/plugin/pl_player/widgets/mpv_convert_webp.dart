@@ -100,7 +100,7 @@ class MpvConvertWebp {
         final prefix = log.prefix.toDartString().trim();
         final level = log.level.toDartString().trim();
         final text = log.text.toDartString().trim();
-        debugPrint('WebpConvert: $level $prefix : $text');
+        if (kDebugMode) debugPrint('WebpConvert: $level $prefix : $text');
         if (kDebugMode) {
           if (level == 'error' || level == 'fatal') _success = false;
         } else {
