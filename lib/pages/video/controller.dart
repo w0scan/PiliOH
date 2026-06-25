@@ -572,6 +572,31 @@ class VideoDetailController extends GetxController
   Future<void> seekTo(Duration duration, {required bool isSeek}) =>
       plPlayerController.seekTo(duration, isSeek: isSeek);
 
+  // Use pl_player's position listener pipeline instead of media_kit's
+  // stream.position — the pipeline is fed by both media_kit and the OHOS
+  // native player, so auto-skip works regardless of backend.
+  ValueChanged<Duration>? _blockPosListener;
+
+  @override
+  bool get hasBlockListener => _blockPosListener != null;
+
+  @override
+  void startBlockListener() {
+    cancelBlockListener();
+    _blockPosListener = onBlockPosition;
+    plPlayerController.addPositionListener(_blockPosListener!);
+  }
+
+  @override
+  void cancelBlockListener() {
+    final l = _blockPosListener;
+    if (l != null) {
+      plPlayerController.removePositionListener(l);
+      _blockPosListener = null;
+    }
+    super.cancelBlockListener();
+  }
+
   @override
   Widget buildItem(Object item, Animation<double> animation) {
     final theme = ThemeUtils.theme;

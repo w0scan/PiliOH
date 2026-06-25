@@ -316,7 +316,7 @@ class _PostPanelState extends State<PostPanel>
       SmartDialog.showToast('提交成功');
       list.clear();
       videoDetailController.handleSBData(response);
-      if (videoDetailController.blockListener == null) {
+      if (!videoDetailController.hasBlockListener) {
         videoDetailController.initSkip();
       }
     } else {

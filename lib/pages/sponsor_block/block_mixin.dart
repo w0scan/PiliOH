@@ -38,7 +38,7 @@ mixin BlockMixin on GetxController {
   int? _lastBlockPos;
   BlockConfigMixin get blockConfig;
   StreamSubscription<Duration>? _blockListener;
-  StreamSubscription<Duration>? get blockListener => _blockListener;
+  bool get hasBlockListener => _blockListener != null;
   late final List<SegmentModel> _segmentList = <SegmentModel>[];
   late final RxList<Segment> segmentProgressList = <Segment>[].obs;
 
@@ -75,42 +75,44 @@ mixin BlockMixin on GetxController {
     }
   }
 
+  void onBlockPosition(Duration position) {
+    int currentPos = position.inSeconds;
+    if (currentPos != _lastBlockPos) {
+      _lastBlockPos = currentPos;
+      final msPos = currentPos * 1000;
+      for (SegmentModel item in _segmentList) {
+        if (msPos <= item.segment.$1 && item.segment.$1 <= msPos + 1000) {
+          switch (item.skipType) {
+            case SkipType.alwaysSkip:
+              onSkip(item, isSeek: false);
+              break;
+            case SkipType.skipOnce:
+              if (!item.hasSkipped) {
+                item.hasSkipped = true;
+                onSkip(item, isSeek: false);
+              }
+              break;
+            case SkipType.skipManually:
+              onAddItem(item);
+              break;
+            default:
+              break;
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  void startBlockListener() {
+    cancelBlockListener();
+    _blockListener = player?.stream.position.listen(onBlockPosition);
+  }
+
   void initSkip() {
     if (isClosed) return;
     if (_segmentList.isNotEmpty) {
-      _blockListener?.cancel();
-      _blockListener = player?.stream.position.listen((position) {
-        int currentPos = position.inSeconds;
-        if (currentPos != _lastBlockPos) {
-          _lastBlockPos = currentPos;
-          final msPos = currentPos * 1000;
-          for (SegmentModel item in _segmentList) {
-            // if (kDebugMode) {
-            //   debugPrint(
-            //       '${position.inSeconds},,${item.segment.first},,${item.segment.second},,${item.skipType.name},,${item.hasSkipped}');
-            // }
-            if (msPos <= item.segment.$1 && item.segment.$1 <= msPos + 1000) {
-              switch (item.skipType) {
-                case SkipType.alwaysSkip:
-                  onSkip(item, isSeek: false);
-                  break;
-                case SkipType.skipOnce:
-                  if (!item.hasSkipped) {
-                    item.hasSkipped = true;
-                    onSkip(item, isSeek: false);
-                  }
-                  break;
-                case SkipType.skipManually:
-                  onAddItem(item);
-                  break;
-                default:
-                  break;
-              }
-              break;
-            }
-          }
-        }
-      });
+      startBlockListener();
     }
   }
 
@@ -138,7 +140,7 @@ mixin BlockMixin on GetxController {
                         '${videoLabel!.value.isNotEmpty ? '/' : ''}${segmentModel.segmentType.title}';
                   }
 
-                  if (_blockListener == null && autoPlay && player != null) {
+                  if (!hasBlockListener && autoPlay) {
                     final currPos = currPosInMilliseconds;
 
                     if (segmentModel.segment.contains(currPos)) {
@@ -189,7 +191,7 @@ mixin BlockMixin on GetxController {
           }),
         );
 
-        if (_blockListener == null && (autoPlay || preInitPlayer)) {
+        if (!hasBlockListener && (autoPlay || preInitPlayer)) {
           await future;
           initSkip();
         }
