@@ -2,6 +2,7 @@ import 'dart:convert' show base64, jsonDecode, jsonEncode, utf8;
 import 'dart:io' show Platform;
 
 import 'package:PiliPlus/http/browser_ua.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:PiliPlus/http/init.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/main.dart';
@@ -128,10 +129,10 @@ class _GeetestWebviewDialogState extends State<GeetestWebviewDialog> {
           final data = jsonDecode(dataStr);
           Get.back(result: data);
         } catch (e) {
-          debugPrint('geetest decode error: $e');
+          if (kDebugMode) debugPrint('geetest decode error: $e');
         }
       } else if (msgStr.startsWith("error:")) {
-        debugPrint('geetest error: $msgStr');
+        if (kDebugMode) debugPrint('geetest error: $msgStr');
       } else if (msgStr.startsWith('close:')) {
         Get.back();
       }
@@ -225,8 +226,8 @@ class _GeetestWebviewDialogState extends State<GeetestWebviewDialog> {
             thirdPartyCookiesEnabled: false,
             enterpriseAuthenticationAppLinkPolicyEnabled: false,
             saveFormData: false,
-            safeBrowsingEnabled: false,
-            isFraudulentWebsiteWarningEnabled: false,
+            safeBrowsingEnabled: true,
+            isFraudulentWebsiteWarningEnabled: true,
             domStorageEnabled: false,
             databaseEnabled: false,
             cacheEnabled: false,
@@ -253,13 +254,13 @@ class _GeetestWebviewDialogState extends State<GeetestWebviewDialog> {
                       return;
                     }
                   }
-                  debugPrint('geetest invalid result: $args');
+                  if (kDebugMode) debugPrint('geetest invalid result: $args');
                 },
               )
               ..addJavaScriptHandler(
                 handlerName: 'error',
                 callback: (args) {
-                  debugPrint('geetest error: $args');
+                  if (kDebugMode) debugPrint('geetest error: $args');
                 },
               )
               ..addJavaScriptHandler(

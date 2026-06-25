@@ -109,8 +109,6 @@ void main() async {
   try {
     await GStorage.init();
   } catch (e) {
-    debugPrint('GStorage init error: $e');
-    await Utils.copyText(e.toString());
     if (kDebugMode) debugPrint('GStorage init error: $e');
     exit(0);
   }
@@ -404,7 +402,7 @@ class _CustomHttpOverrides extends HttpOverrides {
     // ..maxConnectionsPerHost = 32
     /// The default value is 15 seconds.
     //   ..idleTimeout = const Duration(seconds: 15);
-    if (kDebugMode || Pref.badCertificateCallback) {
+    if (Pref.badCertificateCallback) {
       client.badCertificateCallback = (cert, host, port) => true;
     }
     return client;
