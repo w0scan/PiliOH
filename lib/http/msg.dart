@@ -4,6 +4,7 @@ import 'package:PiliPlus/http/api.dart';
 import 'package:PiliPlus/http/constants.dart';
 import 'package:PiliPlus/http/init.dart';
 import 'package:PiliPlus/http/loading_state.dart';
+import 'package:PiliPlus/http/response_handler.dart';
 import 'package:PiliPlus/models_new/msg/im_user_infos/datum.dart';
 import 'package:PiliPlus/models_new/msg/msg_at/data.dart';
 import 'package:PiliPlus/models_new/msg/msg_dnd/uid_setting.dart';
@@ -35,11 +36,7 @@ abstract final class MsgHttp {
         'web_location': 333.40164,
       },
     );
-    if (res.data['code'] == 0) {
-      return Success(MsgReplyData.fromJson(res.data['data']));
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle((data) => MsgReplyData.fromJson(data));
   }
 
   static Future<LoadingState<MsgAtData>> msgFeedAtMe({
@@ -57,11 +54,7 @@ abstract final class MsgHttp {
         'web_location': 333.40164,
       },
     );
-    if (res.data['code'] == 0) {
-      return Success(MsgAtData.fromJson(res.data['data']));
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle((data) => MsgAtData.fromJson(data));
   }
 
   static Future<LoadingState<MsgLikeData>> msgFeedLikeMe({
@@ -79,11 +72,7 @@ abstract final class MsgHttp {
         'web_location': 333.40164,
       },
     );
-    if (res.data['code'] == 0) {
-      return Success(MsgLikeData.fromJson(res.data['data']));
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle((data) => MsgLikeData.fromJson(data));
   }
 
   static Future<LoadingState<MsgLikeDetailData>> msgLikeDetail({
@@ -103,11 +92,7 @@ abstract final class MsgHttp {
         'web_location': 333.40164,
       },
     );
-    if (res.data['code'] == 0) {
-      return Success(MsgLikeDetailData.fromJson(res.data['data']));
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle((data) => MsgLikeDetailData.fromJson(data));
   }
 
   static Future<LoadingState<List<MsgSysItem>?>> msgFeedNotify({
@@ -124,15 +109,9 @@ abstract final class MsgHttp {
         'web_location': 333.40164,
       },
     );
-    if (res.data['code'] == 0) {
-      return Success(
-        (res.data['data'] as List?)
-            ?.map((e) => MsgSysItem.fromJson(e))
-            .toList(),
-      );
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle(
+      (data) => (data as List?)?.map((e) => MsgSysItem.fromJson(e)).toList(),
+    );
   }
 
   static Future<LoadingState<void>> msgSysUpdateCursor(int cursor) async {
@@ -144,11 +123,7 @@ abstract final class MsgHttp {
         'cursor': cursor,
       },
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<Map>> uploadImage({
@@ -165,11 +140,7 @@ abstract final class MsgHttp {
         'csrf': Accounts.main.csrf,
       }),
     );
-    if (res.data['code'] == 0) {
-      return Success(res.data['data']);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle((data) => data as Map);
   }
 
   static Future<LoadingState<UploadBfsResData>> uploadBfs({
@@ -188,11 +159,7 @@ abstract final class MsgHttp {
       }),
       cancelToken: cancelToken,
     );
-    if (res.data['code'] == 0) {
-      return Success(UploadBfsResData.fromJson(res.data['data']));
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle((data) => UploadBfsResData.fromJson(data));
   }
 
   static Future<LoadingState<void>> createTextDynamic(
@@ -210,13 +177,9 @@ abstract final class MsgHttp {
     final res = await Request().post(
       HttpString.tUrl + Api.createTextDynamic,
       data: data,
-      options: Options(contentType: Headers.formUrlEncodedContentType),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<void>> removeDynamic({
@@ -236,11 +199,7 @@ abstract final class MsgHttp {
         "rid_str": ?ridStr,
       },
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<void>> removeMsg(
@@ -258,13 +217,9 @@ abstract final class MsgHttp {
     final res = await Request().post(
       HttpString.tUrl + Api.removeMsg,
       data: data,
-      options: Options(contentType: Headers.formUrlEncodedContentType),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<void>> delMsgfeed(
@@ -282,13 +237,9 @@ abstract final class MsgHttp {
         'csrf_token': csrf,
         'csrf': csrf,
       },
-      options: Options(contentType: Headers.formUrlEncodedContentType),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<void>> delSysMsg(
@@ -309,11 +260,7 @@ abstract final class MsgHttp {
         'mobi_app': 'android',
       },
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<void>> setTop({
@@ -333,13 +280,9 @@ abstract final class MsgHttp {
     final res = await Request().post(
       HttpString.tUrl + Api.setTop,
       data: data,
-      options: Options(contentType: Headers.formUrlEncodedContentType),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   // 消息标记已读
@@ -439,15 +382,9 @@ abstract final class MsgHttp {
         'csrf_token': csrf,
         'csrf': csrf,
       },
-      options: Options(
-        contentType: Headers.formUrlEncodedContentType,
-      ),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<void>> setMsgDnd({
@@ -467,13 +404,9 @@ abstract final class MsgHttp {
         'csrf_token': csrf,
         'csrf': csrf,
       },
-      options: Options(contentType: Headers.formUrlEncodedContentType),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<void>> setPushSs({
@@ -491,13 +424,9 @@ abstract final class MsgHttp {
         'csrf_token': csrf,
         'csrf': csrf,
       },
-      options: Options(contentType: Headers.formUrlEncodedContentType),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<List<ImUserInfosData>?>> imUserInfos({
@@ -514,15 +443,10 @@ abstract final class MsgHttp {
         'csrf': csrf,
       },
     );
-    if (res.data['code'] == 0) {
-      return Success(
-        (res.data['data'] as List?)
-            ?.map((e) => ImUserInfosData.fromJson(e))
-            .toList(),
-      );
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle(
+      (data) =>
+          (data as List?)?.map((e) => ImUserInfosData.fromJson(e)).toList(),
+    );
   }
 
   static Future<LoadingState<SessionSsData>> getSessionSs({
@@ -539,11 +463,7 @@ abstract final class MsgHttp {
         'csrf': csrf,
       },
     );
-    if (res.data['code'] == 0) {
-      return Success(SessionSsData.fromJson(res.data['data']));
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle((data) => SessionSsData.fromJson(data));
   }
 
   static Future<LoadingState<List<UidSetting>?>> getMsgDnd({
@@ -561,15 +481,12 @@ abstract final class MsgHttp {
         'csrf': csrf,
       },
     );
-    if (res.data['code'] == 0) {
-      return Success(
-        (res.data['data']?['uid_settings'] as List?)
-            ?.map((e) => UidSetting.fromJson(e))
-            .toList(),
-      );
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle(
+      (data) =>
+          (data?['uid_settings'] as List?)
+              ?.map((e) => UidSetting.fromJson(e))
+              .toList(),
+    );
   }
 
   static Future<LoadingState<SingleUnreadData>> msgUnread() async {
@@ -582,11 +499,7 @@ abstract final class MsgHttp {
         'web_location': 333.1365,
       },
     );
-    if (res.data['code'] == 0) {
-      return Success(SingleUnreadData.fromJson(res.data['data']));
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle((data) => SingleUnreadData.fromJson(data));
   }
 
   static Future<LoadingState<MsgFeedUnreadData>> msgFeedUnread() async {
@@ -598,11 +511,7 @@ abstract final class MsgHttp {
         'web_location': 333.1365,
       },
     );
-    if (res.data['code'] == 0) {
-      return Success(MsgFeedUnreadData.fromJson(res.data['data']));
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle((data) => MsgFeedUnreadData.fromJson(data));
   }
 
   static Future<LoadingState<void>> imMsgReport({
@@ -625,12 +534,8 @@ abstract final class MsgHttp {
         'extra': jsonEncode(extra),
         'csrf': Accounts.main.csrf,
       },
-      options: Options(contentType: Headers.formUrlEncodedContentType),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 }
