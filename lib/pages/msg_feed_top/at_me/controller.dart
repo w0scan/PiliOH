@@ -2,19 +2,10 @@ import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/msg.dart';
 import 'package:PiliPlus/models_new/msg/msg_at/data.dart';
 import 'package:PiliPlus/models_new/msg/msg_at/item.dart';
-import 'package:PiliPlus/pages/common/common_list_controller.dart';
+import 'package:PiliPlus/pages/common/cursor_list_controller.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
-class AtMeController extends CommonListController<MsgAtData, MsgAtItem> {
-  int? cursor;
-  int? cursorTime;
-
-  @override
-  void onInit() {
-    super.onInit();
-    queryData();
-  }
-
+class AtMeController extends CursorListController<MsgAtData, MsgAtItem> {
   @override
   List<MsgAtItem>? getDataList(MsgAtData response) {
     if (response.cursor?.isEnd == true) {
@@ -23,13 +14,6 @@ class AtMeController extends CommonListController<MsgAtData, MsgAtItem> {
     cursor = response.cursor?.id;
     cursorTime = response.cursor?.time;
     return response.items;
-  }
-
-  @override
-  Future<void> onRefresh() {
-    cursor = null;
-    cursorTime = null;
-    return super.onRefresh();
   }
 
   @override

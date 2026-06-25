@@ -4,6 +4,7 @@ import 'package:PiliPlus/http/browser_ua.dart';
 import 'package:PiliPlus/http/init.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/login.dart';
+import 'package:PiliPlus/http/response_handler.dart';
 import 'package:PiliPlus/models/common/account_type.dart';
 import 'package:PiliPlus/models/common/live/live_contribution_rank_type.dart';
 import 'package:PiliPlus/models/common/live/live_search_type.dart';
@@ -73,11 +74,7 @@ abstract final class LiveHttp {
         'csrf_token': csrf,
       }),
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<RoomPlayInfoData>> liveRoomInfo({
@@ -121,11 +118,7 @@ abstract final class LiveHttp {
         'room_id': roomId,
       },
     );
-    if (res.data['code'] == 0) {
-      return Success(RoomInfoH5Data.fromJson(res.data['data']));
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle((data) => RoomInfoH5Data.fromJson(data));
   }
 
   static Future<LoadingState<List<DanmakuMsg>?>> liveRoomDmPrefetch({
@@ -187,11 +180,7 @@ abstract final class LiveHttp {
         'room_id': roomId,
       },
     );
-    if (res.data['code'] == 0) {
-      return Success(LiveEmoteData.fromJson(res.data['data']).data);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle((data) => LiveEmoteData.fromJson(data).data);
   }
 
   static Future<LoadingState<LiveIndexData>> liveFeedIndex({
@@ -243,11 +232,7 @@ abstract final class LiveHttp {
         },
       ),
     );
-    if (res.data['code'] == 0) {
-      return Success(LiveIndexData.fromJson(res.data['data']));
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle((data) => LiveIndexData.fromJson(data));
   }
 
   static Future<LoadingState<LiveFollowData>> liveFollow(int page) async {
@@ -260,11 +245,7 @@ abstract final class LiveHttp {
         'hit_ab': true,
       },
     );
-    if (res.data['code'] == 0) {
-      return Success(LiveFollowData.fromJson(res.data['data']));
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle((data) => LiveFollowData.fromJson(data));
   }
 
   static Future<LoadingState<LiveSecondData>> liveSecondList({
@@ -323,11 +304,7 @@ abstract final class LiveHttp {
         },
       ),
     );
-    if (res.data['code'] == 0) {
-      return Success(LiveSecondData.fromJson(res.data['data']));
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle((data) => LiveSecondData.fromJson(data));
   }
 
   static Future<LoadingState<List<AreaList>?>> liveAreaList() async {
@@ -350,15 +327,10 @@ abstract final class LiveHttp {
       Api.liveAreaList,
       queryParameters: params,
     );
-    if (res.data['code'] == 0) {
-      return Success(
-        (res.data['data']?['list'] as List?)
-            ?.map((e) => AreaList.fromJson(e))
-            .toList(),
-      );
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle(
+      (data) =>
+          (data?['list'] as List?)?.map((e) => AreaList.fromJson(e)).toList(),
+    );
   }
 
   static Future<LoadingState<List<AreaItem>>> getLiveFavTag() async {
@@ -382,16 +354,11 @@ abstract final class LiveHttp {
       queryParameters: params,
     );
 
-    if (res.data['code'] == 0) {
-      return Success(
-        (res.data['data']?['tags'] as List?)
-                ?.map((e) => AreaItem.fromJson(e))
-                .toList() ??
-            <AreaItem>[],
-      );
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle(
+      (data) =>
+          (data?['tags'] as List?)?.map((e) => AreaItem.fromJson(e)).toList() ??
+          <AreaItem>[],
+    );
   }
 
   static Future<LoadingState<void>> setLiveFavTag({
@@ -416,14 +383,9 @@ abstract final class LiveHttp {
     final res = await Request().post(
       Api.setLiveFavTag,
       data: data,
-      options: Options(contentType: Headers.formUrlEncodedContentType),
+      options: HttpUtils.formOptions,
     );
-
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<List<AreaItem>?>> liveRoomAreaList({
@@ -451,13 +413,9 @@ abstract final class LiveHttp {
       Api.liveRoomAreaList,
       queryParameters: params,
     );
-    if (res.data['code'] == 0) {
-      return Success(
-        (res.data['data'] as List?)?.map((e) => AreaItem.fromJson(e)).toList(),
-      );
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle(
+      (data) => (data as List?)?.map((e) => AreaItem.fromJson(e)).toList(),
+    );
   }
 
   static Future<LoadingState<LiveSearchData>> liveSearch({
@@ -488,11 +446,7 @@ abstract final class LiveHttp {
       Api.liveSearch,
       queryParameters: params,
     );
-    if (res.data['code'] == 0) {
-      return Success(LiveSearchData.fromJson(res.data['data']));
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle((data) => LiveSearchData.fromJson(data));
   }
 
   static Future<LoadingState<ShieldInfo?>> getLiveInfoByUser(
@@ -529,11 +483,7 @@ abstract final class LiveHttp {
       },
       options: Options(contentType: Headers.formUrlEncodedContentType),
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<void>> addShieldKeyword({
@@ -547,13 +497,9 @@ abstract final class LiveHttp {
         'csrf': csrf,
         'csrf_token': csrf,
       },
-      options: Options(contentType: Headers.formUrlEncodedContentType),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<void>> delShieldKeyword({
@@ -567,13 +513,9 @@ abstract final class LiveHttp {
         'csrf': csrf,
         'csrf_token': csrf,
       },
-      options: Options(contentType: Headers.formUrlEncodedContentType),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<ShieldUserList>> liveShieldUser({
@@ -591,13 +533,9 @@ abstract final class LiveHttp {
         'csrf': csrf,
         'csrf_token': csrf,
       },
-      options: Options(contentType: Headers.formUrlEncodedContentType),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return Success(ShieldUserList.fromJson(res.data['data']));
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle((data) => ShieldUserList.fromJson(data));
   }
 
   static Future<LoadingState<void>> liveLikeReport({
@@ -616,13 +554,9 @@ abstract final class LiveHttp {
         'web_location': 444.8,
         'csrf': Accounts.heartbeat.csrf,
       }),
-      options: Options(contentType: Headers.formUrlEncodedContentType),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   @pragma('vm:notify-debugger-on-exception')
@@ -677,13 +611,9 @@ abstract final class LiveHttp {
     final res = await Request().post(
       Api.liveDmReport,
       data: data,
-      options: Options(contentType: Headers.formUrlEncodedContentType),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<LiveContributionRankData>> liveContributionRank({
@@ -743,13 +673,9 @@ abstract final class LiveHttp {
         'csrf': csrf,
         'visit_id': '',
       },
-      options: Options(contentType: Headers.formUrlEncodedContentType),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<MedalWallData>> liveMedalWall({
@@ -759,10 +685,6 @@ abstract final class LiveHttp {
       Api.liveMedalWall,
       queryParameters: {'target_id': mid},
     );
-    if (res.data['code'] == 0) {
-      return Success(MedalWallData.fromJson(res.data['data']));
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle((data) => MedalWallData.fromJson(data));
   }
 }

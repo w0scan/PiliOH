@@ -2,6 +2,7 @@ import 'package:PiliPlus/common/constants.dart';
 import 'package:PiliPlus/http/api.dart';
 import 'package:PiliPlus/http/init.dart';
 import 'package:PiliPlus/http/loading_state.dart';
+import 'package:PiliPlus/http/response_handler.dart';
 import 'package:PiliPlus/models/common/fav_order_type.dart';
 import 'package:PiliPlus/models_new/fav/fav_article/data.dart';
 import 'package:PiliPlus/models_new/fav/fav_detail/data.dart';
@@ -21,33 +22,19 @@ abstract final class FavHttp {
   static Future<LoadingState<void>> favFavFolder(Object mediaId) async {
     final res = await Request().post(
       Api.favFavFolder,
-      data: {
-        'media_id': mediaId,
-        'csrf': Accounts.main.csrf,
-      },
-      options: Options(contentType: Headers.formUrlEncodedContentType),
+      data: HttpUtils.csrfData({'media_id': mediaId}),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<void>> unfavFavFolder(Object mediaId) async {
     final res = await Request().post(
       Api.unfavFavFolder,
-      data: {
-        'media_id': mediaId,
-        'csrf': Accounts.main.csrf,
-      },
-      options: Options(contentType: Headers.formUrlEncodedContentType),
+      data: HttpUtils.csrfData({'media_id': mediaId}),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<FavDetailData>> userFavFolderDetail({
@@ -71,11 +58,7 @@ abstract final class FavHttp {
         'platform': 'web',
       },
     );
-    if (res.data['code'] == 0) {
-      return Success(FavDetailData.fromJson(res.data['data']));
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle((data) => FavDetailData.fromJson(data));
   }
 
   // 取消订阅
@@ -86,26 +69,18 @@ abstract final class FavHttp {
     final res = type == 11
         ? await Request().post(
             Api.unfavFolder,
-            data: {
-              'media_id': id,
-              'csrf': Accounts.main.csrf,
-            },
-            options: Options(contentType: Headers.formUrlEncodedContentType),
+            data: HttpUtils.csrfData({'media_id': id}),
+            options: HttpUtils.formOptions,
           )
         : await Request().post(
             Api.unfavSeason,
-            data: {
+            data: HttpUtils.csrfData({
               'platform': 'web',
               'season_id': id,
-              'csrf': Accounts.main.csrf,
-            },
-            options: Options(contentType: Headers.formUrlEncodedContentType),
+            }),
+            options: HttpUtils.formOptions,
           );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<SubDetailData>> favSeasonList({
@@ -121,11 +96,7 @@ abstract final class FavHttp {
         'pn': pn,
       },
     );
-    if (res.data['code'] == 0) {
-      return Success(SubDetailData.fromJson(res.data['data']));
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle((data) => SubDetailData.fromJson(data));
   }
 
   static Future<LoadingState<SpaceCheeseData>> favPugv({
@@ -141,43 +112,25 @@ abstract final class FavHttp {
         'web_location': 333.1387,
       },
     );
-    if (res.data['code'] == 0) {
-      return Success(SpaceCheeseData.fromJson(res.data['data']));
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle((data) => SpaceCheeseData.fromJson(data));
   }
 
   static Future<LoadingState<void>> addFavPugv(Object seasonId) async {
     final res = await Request().post(
       Api.addFavPugv,
-      data: {
-        'season_id': seasonId,
-        'csrf': Accounts.main.csrf,
-      },
-      options: Options(contentType: Headers.formUrlEncodedContentType),
+      data: HttpUtils.csrfData({'season_id': seasonId}),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<void>> delFavPugv(Object seasonId) async {
     final res = await Request().post(
       Api.delFavPugv,
-      data: {
-        'season_id': seasonId,
-        'csrf': Accounts.main.csrf,
-      },
-      options: Options(contentType: Headers.formUrlEncodedContentType),
+      data: HttpUtils.csrfData({'season_id': seasonId}),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<FavTopicData>> favTopic({
@@ -191,43 +144,25 @@ abstract final class FavHttp {
         'web_location': 333.1387,
       },
     );
-    if (res.data['code'] == 0) {
-      return Success(FavTopicData.fromJson(res.data['data']));
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle((data) => FavTopicData.fromJson(data));
   }
 
   static Future<LoadingState<void>> addFavTopic(Object topicId) async {
     final res = await Request().post(
       Api.addFavTopic,
-      data: {
-        'topic_id': topicId,
-        'csrf': Accounts.main.csrf,
-      },
-      options: Options(contentType: Headers.formUrlEncodedContentType),
+      data: HttpUtils.csrfData({'topic_id': topicId}),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<void>> delFavTopic(Object topicId) async {
     final res = await Request().post(
       Api.delFavTopic,
-      data: {
-        'topic_id': topicId,
-        'csrf': Accounts.main.csrf,
-      },
-      options: Options(contentType: Headers.formUrlEncodedContentType),
+      data: HttpUtils.csrfData({'topic_id': topicId}),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<void>> likeTopic(
@@ -236,20 +171,15 @@ abstract final class FavHttp {
   ) async {
     final res = await Request().post(
       Api.likeTopic,
-      data: {
+      data: HttpUtils.csrfData({
         'action': isLike ? 'cancel_like' : 'like',
         'up_mid': Accounts.main.mid,
         'topic_id': topicId,
-        'csrf': Accounts.main.csrf,
         'business': 'topic',
-      },
-      options: Options(contentType: Headers.formUrlEncodedContentType),
+      }),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<FavArticleData>> favArticle({
@@ -262,11 +192,7 @@ abstract final class FavHttp {
         'page': page,
       },
     );
-    if (res.data['code'] == 0) {
-      return Success(FavArticleData.fromJson(res.data['data']));
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle((data) => FavArticleData.fromJson(data));
   }
 
   static Future<LoadingState<void>> addFavArticle({
@@ -274,19 +200,10 @@ abstract final class FavHttp {
   }) async {
     final res = await Request().post(
       Api.addFavArticle,
-      data: {
-        'id': id,
-        'csrf': Accounts.main.csrf,
-      },
-      options: Options(
-        contentType: Headers.formUrlEncodedContentType,
-      ),
+      data: HttpUtils.csrfData({'id': id}),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<void>> delFavArticle({
@@ -294,19 +211,10 @@ abstract final class FavHttp {
   }) async {
     final res = await Request().post(
       Api.delFavArticle,
-      data: {
-        'id': id,
-        'csrf': Accounts.main.csrf,
-      },
-      options: Options(
-        contentType: Headers.formUrlEncodedContentType,
-      ),
+      data: HttpUtils.csrfData({'id': id}),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<List<FavNoteItemModel>?>> userNoteList({
@@ -357,19 +265,12 @@ abstract final class FavHttp {
   }) async {
     final res = await Request().post(
       isPublish ? Api.delPublishNote : Api.delNote,
-      data: {
+      data: HttpUtils.csrfData({
         isPublish ? 'cvids' : 'note_ids': noteIds,
-        'csrf': Accounts.main.csrf,
-      },
-      options: Options(
-        contentType: Headers.formUrlEncodedContentType,
-      ),
+      }),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<FavPgcData>> favPgc({
@@ -387,11 +288,7 @@ abstract final class FavHttp {
         'pn': pn,
       },
     );
-    if (res.data['code'] == 0) {
-      return Success(FavPgcData.fromJson(res.data['data']));
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle((data) => FavPgcData.fromJson(data));
   }
 
   // 收藏夹
@@ -466,20 +363,13 @@ abstract final class FavHttp {
   }) async {
     final res = await Request().post(
       Api.cleanFav,
-      data: {
+      data: HttpUtils.csrfData({
         'media_id': mediaId,
         'platform': 'web',
-        'csrf': Accounts.main.csrf,
-      },
-      options: Options(
-        contentType: Headers.formUrlEncodedContentType,
-      ),
+      }),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<void>> deleteFolder({
@@ -487,20 +377,13 @@ abstract final class FavHttp {
   }) async {
     final res = await Request().post(
       Api.deleteFolder,
-      data: {
+      data: HttpUtils.csrfData({
         'media_ids': mediaIds,
         'platform': 'web',
-        'csrf': Accounts.main.csrf,
-      },
-      options: Options(
-        contentType: Headers.formUrlEncodedContentType,
-      ),
+      }),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<FavFolderInfo>> addOrEditFolder({
@@ -513,23 +396,16 @@ abstract final class FavHttp {
   }) async {
     final res = await Request().post(
       isAdd ? Api.addFolder : Api.editFolder,
-      data: {
+      data: HttpUtils.csrfData({
         'title': title,
         'intro': intro,
         'privacy': privacy,
         'cover': cover.isNotEmpty ? Uri.encodeFull(cover) : cover,
-        'csrf': Accounts.main.csrf,
         'media_id': ?mediaId,
-      },
-      options: Options(
-        contentType: Headers.formUrlEncodedContentType,
-      ),
+      }),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return Success(FavFolderInfo.fromJson(res.data['data']));
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle((data) => FavFolderInfo.fromJson(data));
   }
 
   static Future<LoadingState<FavFolderInfo>> favFolderInfo({
@@ -541,11 +417,7 @@ abstract final class FavHttp {
         'media_id': mediaId,
       },
     );
-    if (res.data['code'] == 0) {
-      return Success(FavFolderInfo.fromJson(res.data['data']));
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle((data) => FavFolderInfo.fromJson(data));
   }
 
   static Future<LoadingState<void>> seasonFav({
@@ -554,20 +426,13 @@ abstract final class FavHttp {
   }) async {
     final res = await Request().post(
       isFav ? Api.unfavSeason : Api.favSeason,
-      data: {
+      data: HttpUtils.csrfData({
         'platform': 'web',
         'season_id': seasonId,
-        'csrf': Accounts.main.csrf,
-      },
-      options: Options(
-        contentType: Headers.formUrlEncodedContentType,
-      ),
+      }),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<List<SpaceFavData>?>> spaceFav({
@@ -594,15 +459,9 @@ abstract final class FavHttp {
         },
       ),
     );
-    if (res.data['code'] == 0) {
-      return Success(
-        (res.data['data'] as List?)
-            ?.map((e) => SpaceFavData.fromJson(e))
-            .toList(),
-      );
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle(
+      (data) => (data as List?)?.map((e) => SpaceFavData.fromJson(e)).toList(),
+    );
   }
 
   static Future<LoadingState<void>> communityAction({
@@ -622,11 +481,7 @@ abstract final class FavHttp {
         "action": action, // 3 fav, 4 unfav
       },
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   // （取消）收藏
@@ -637,19 +492,14 @@ abstract final class FavHttp {
   }) async {
     final res = await Request().post(
       Api.favVideo,
-      data: {
+      data: HttpUtils.csrfData({
         'resources': resources,
         'add_media_ids': addIds ?? '',
         'del_media_ids': delIds ?? '',
-        'csrf': Accounts.main.csrf,
-      },
-      options: Options(contentType: Headers.formUrlEncodedContentType),
+      }),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   // （取消）收藏
@@ -659,18 +509,10 @@ abstract final class FavHttp {
   }) async {
     final res = await Request().post(
       Api.unfavAll,
-      data: {
-        'rid': rid,
-        'type': type,
-        'csrf': Accounts.main.csrf,
-      },
-      options: Options(contentType: Headers.formUrlEncodedContentType),
+      data: HttpUtils.csrfData({'rid': rid, 'type': type}),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<void>> copyOrMoveFav({
@@ -689,21 +531,16 @@ abstract final class FavHttp {
           : isCopy
           ? Api.copyToview
           : Api.moveToview,
-      data: {
+      data: HttpUtils.csrfData({
         'src_media_id': ?srcMediaId,
         'tar_media_id': tarMediaId,
         'mid': ?mid,
         'resources': resources,
         'platform': 'web',
-        'csrf': Accounts.main.csrf,
-      },
-      options: Options(contentType: Headers.formUrlEncodedContentType),
+      }),
+      options: HttpUtils.formOptions,
     );
-    if (res.data['code'] == 0) {
-      return const Success(null);
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handleVoid();
   }
 
   static Future<LoadingState<FavFolderData>> allFavFolders(Object mid) async {
@@ -711,11 +548,7 @@ abstract final class FavHttp {
       Api.favFolder,
       queryParameters: {'up_mid': mid},
     );
-    if (res.data['code'] == 0) {
-      return Success(FavFolderData.fromJson(res.data['data']));
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle((data) => FavFolderData.fromJson(data));
   }
 
   // 查看视频被收藏在哪个文件夹
@@ -732,10 +565,6 @@ abstract final class FavHttp {
         'type': ?type,
       },
     );
-    if (res.data['code'] == 0) {
-      return Success(FavFolderData.fromJson(res.data['data']));
-    } else {
-      return Error(res.data['message']);
-    }
+    return res.handle((data) => FavFolderData.fromJson(data));
   }
 }
