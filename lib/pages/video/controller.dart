@@ -321,7 +321,9 @@ class VideoDetailController extends GetxController
           animationController.forward(from: 1 - scrollCtr.offset / videoHeight);
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      if (kDebugMode) debugPrint('scroll animation failed: $e');
+    }
   }
 
   void scrollListener() {
@@ -461,7 +463,11 @@ class VideoDetailController extends GetxController
                 Get.find<UgcIntroController>(
                   tag: heroTag,
                 ).onChangeEpisode(item);
-              } catch (_) {}
+              } catch (e) {
+                if (kDebugMode) {
+                  debugPrint('UgcIntroController not found: $e');
+                }
+              }
               break;
             }
           }
@@ -483,7 +489,11 @@ class VideoDetailController extends GetxController
         onChangeEpisode: (episode) {
           try {
             Get.find<UgcIntroController>(tag: heroTag).onChangeEpisode(episode);
-          } catch (_) {}
+          } catch (e) {
+            if (kDebugMode) {
+              debugPrint('UgcIntroController not found: $e');
+            }
+          }
         },
         panelTitle: watchLaterTitle,
         bvid: bvid,
@@ -1167,7 +1177,9 @@ class VideoDetailController extends GetxController
               }
             }
           }
-        } catch (_) {}
+        } catch (e) {
+          if (kDebugMode) debugPrint('lastPlayCid processing failed: $e');
+        }
       }
 
       if (plPlayerController.showViewPoints &&
@@ -1183,7 +1195,9 @@ class VideoDetailController extends GetxController
               to: item.to,
             );
           }).toList();
-        } catch (_) {}
+        } catch (e) {
+          if (kDebugMode) debugPrint('viewPointList processing failed: $e');
+        }
       }
 
       if (response.subtitle?.subtitles?.isNotEmpty == true) {
@@ -1238,7 +1252,9 @@ class VideoDetailController extends GetxController
           pgcType: isUgc ? null : pgcType,
           videoType: videoType,
         );
-      } catch (_) {}
+      } catch (e, s) {
+        Utils.reportError(e, s);
+      }
     }
   }
 
@@ -1346,7 +1362,9 @@ class VideoDetailController extends GetxController
       title = Get.find<UgcIntroController>(
         tag: heroTag,
       ).videoDetail.value.title;
-    } catch (_) {}
+    } catch (e) {
+      if (kDebugMode) debugPrint('Failed to get title for noteList: $e');
+    }
     if (plPlayerController.isFullScreen.value || showVideoSheet) {
       final child = NoteListPage(
         oid: aid,
@@ -1408,7 +1426,9 @@ class VideoDetailController extends GetxController
           extraId = 8;
           from = PlaylistSource.MEDIA_LIST;
         }
-      } catch (_) {}
+      } catch (e) {
+        if (kDebugMode) debugPrint('UgcIntroController not found: $e');
+      }
     }
     AudioPage.toAudioPage(
       itemType: 1,
@@ -1590,7 +1610,9 @@ class VideoDetailController extends GetxController
             tag: heroTag,
           ).videoDetail.value.title;
         }
-      } catch (_) {}
+      } catch (e) {
+        if (kDebugMode) debugPrint('Failed to get title for DLNA: $e');
+      }
       if (kDebugMode) {
         debugPrint(title);
       }

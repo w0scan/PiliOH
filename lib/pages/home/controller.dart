@@ -95,6 +95,8 @@ class HomeController extends GetxController
         defaultSearch.value = res.data['data']?['name'] ?? '';
         // defaultSearch.value = res.data['data']?['show_name'] ?? '';
       }
-    } catch (_) {}
+    } catch (e) {
+      if (kDebugMode) debugPrint('querySearchDefault failed: $e');
+    }
   }
 }

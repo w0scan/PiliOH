@@ -145,7 +145,9 @@ class AudioController extends GetxController
     if (args['heroTag'] case String heroTag) {
       try {
         _videoDetailController = Get.find<VideoDetailController>(tag: heroTag);
-      } catch (_) {}
+      } catch (e) {
+        if (kDebugMode) debugPrint('VideoDetailController not found: $e');
+      }
     }
 
     _queryPlayList(isInit: true);
@@ -261,7 +263,9 @@ class AudioController extends GetxController
         final bvid = IdUtils.av2bv(oid.toInt());
         final cid = subId.first.toInt();
         querySponsorBlock(bvid: bvid, cid: cid);
-      } catch (_) {}
+      } catch (e, s) {
+        Utils.reportError(e, s);
+      }
     }
   }
 
@@ -427,7 +431,9 @@ class AudioController extends GetxController
           ..hasLike_7 = newVal
           ..like += newVal ? 1 : -1;
         audioItem.refresh();
-      } catch (_) {}
+      } catch (e) {
+        if (kDebugMode) debugPrint('Failed to update like stat: $e');
+      }
       SmartDialog.showToast(response.message);
     } else {
       res.toast();
@@ -455,7 +461,9 @@ class AudioController extends GetxController
             ..hasCoin_8 = true
             ..coin += 2;
           audioItem.refresh();
-        } catch (_) {}
+        } catch (e) {
+          if (kDebugMode) debugPrint('Failed to update coin stat: $e');
+        }
       }
       hasFav.value = true;
       if (!hasCoin) {
@@ -496,7 +504,9 @@ class AudioController extends GetxController
             ..like += 1;
         }
         audioItem.refresh();
-      } catch (_) {}
+      } catch (e) {
+        if (kDebugMode) debugPrint('Failed to update coin stat: $e');
+      }
       GlobalData().afterCoin(coin);
     } else {
       res.toast();
@@ -736,7 +746,9 @@ class AudioController extends GetxController
         ..hasFav = count > 0
         ..favourite += count;
       audioItem.refresh();
-    } catch (_) {}
+    } catch (e) {
+      if (kDebugMode) debugPrint('Failed to update fav stat: $e');
+    }
   }
 
   Future<void> loadPrev(BuildContext context) async {

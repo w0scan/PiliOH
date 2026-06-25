@@ -127,9 +127,13 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
           try {
             Get.find<VideoReplyController>(tag: heroTag).count.value =
                 response.stat?.reply ?? 0;
-          } catch (_) {}
+          } catch (_) {
+            // VideoReplyController may not be registered
+          }
         }
-      } catch (_) {}
+      } catch (e) {
+        if (kDebugMode) debugPrint('Failed to update video detail cover/reply: $e');
+      }
       final pages = videoDetail.value.pages;
       if (pages != null && pages.isNotEmpty && cid.value == 0) {
         cid.value = pages.first.cid!;
@@ -520,7 +524,9 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
             Get.find<RelatedController>(tag: heroTag)
               ..bvid = bvid
               ..queryData();
-          } catch (_) {}
+          } catch (_) {
+            // RelatedController may not be registered
+          }
         }
 
         // 重新请求评论
@@ -531,7 +537,9 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
             if (replyCtr.loadingState.value is! Loading) {
               replyCtr.onReload();
             }
-          } catch (_) {}
+          } catch (_) {
+            // VideoReplyController may not be registered
+          }
         }
 
         hasLater.value = videoDetailCtr.sourceType == SourceType.watchLater;

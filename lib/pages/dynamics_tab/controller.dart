@@ -1,4 +1,5 @@
 import 'package:PiliPlus/http/dynamics.dart';
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/msg.dart';
 import 'package:PiliPlus/models/common/dynamic/dynamics_type.dart';
@@ -87,7 +88,9 @@ class DynamicsTabController
       }
       item.modules.moduleFold = null;
       loadingState.refresh();
-    } catch (_) {}
+    } catch (e) {
+      if (kDebugMode) debugPrint('onUnfold failed: $e');
+    }
   }
 
   @override
