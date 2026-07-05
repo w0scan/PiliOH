@@ -82,7 +82,6 @@ class _FavSortPageState extends State<FavSortPage> with ReorderMixin {
   }
 
   void onReorderItem(int oldIndex, int newIndex) {
-    if (oldIndex < newIndex) newIndex--;
     final oldItem = sortList[oldIndex];
     final newItem = sortList.getOrNull(
       oldIndex > newIndex ? newIndex - 1 : newIndex, // might be Negative
@@ -98,7 +97,7 @@ class _FavSortPageState extends State<FavSortPage> with ReorderMixin {
 
   Widget get _buildBody {
     final child = ReorderableListView.builder(
-      onReorder: onReorderItem,
+      onReorderItem: onReorderItem,
       proxyDecorator: proxyDecorator,
       physics: const AlwaysScrollableScrollPhysics(),
       padding:
@@ -109,7 +108,7 @@ class _FavSortPageState extends State<FavSortPage> with ReorderMixin {
         final item = sortList[index];
         return SizedBox(
           key: ValueKey(item.id),
-          height: 98,
+          height: 110,
           child: FavVideoCardH(item: item),
         );
       },

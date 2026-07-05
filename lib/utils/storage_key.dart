@@ -8,8 +8,7 @@ abstract final class SettingBoxKey {
       defaultAudioQaCellular = 'defaultAudioQaCellular',
       autoPlayEnable = 'autoPlayEnable',
       fullScreenMode = 'fullScreenMode',
-      defaultDecode = 'defaultDecode',
-      secondDecode = 'secondDecode',
+      preferCodecs = 'preferCodecs',
       defaultToastOp = 'defaultToastOp',
       defaultPicQa = 'defaultPicQa',
       enableHA = 'enableHA',
@@ -30,9 +29,6 @@ abstract final class SettingBoxKey {
       pgcSkipType = 'pgcSkipType',
       audioPlayMode = 'audioPlayMode',
       showBatteryLevel = 'showBatteryLevel',
-      useNativePlayer = 'useNativePlayer',
-      nativeSyncMaster = 'nativeSyncMaster',
-      nativeSyncThresholdMs = 'nativeSyncThresholdMs',
       playerVolume = 'playerVolume',
       maxVolume = 'maxVolume';
 
@@ -59,7 +55,6 @@ abstract final class SettingBoxKey {
       banWordForRecommend = 'banWordForRecommend',
       applyFilterToRelatedVideos = 'applyFilterToRelatedVideos',
       autoUpdate = 'autoUpdate',
-      autoClearCache = 'autoClearCache',
       maxCacheSize = 'maxCacheSize',
       defaultShowComment = 'defaultShowComment',
       replySortType = 'replySortType',

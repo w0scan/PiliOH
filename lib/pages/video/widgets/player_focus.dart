@@ -108,6 +108,10 @@ class PlayerFocus extends StatelessWidget {
         introController!.onCancelTriple(isKeyQ);
       }
       return true;
+    } else if (event is KeyDownEvent) {
+      if (introController?.isTripling ?? false) {
+        introController!.onCancelTriple();
+      }
     }
 
     final isArrowUp = key == LogicalKeyboardKey.arrowUp;
@@ -181,8 +185,8 @@ class PlayerFocus extends StatelessWidget {
           return true;
 
         case LogicalKeyboardKey.keyD:
-          final newVal = !plPlayerController.enableShowDanmaku.value;
-          plPlayerController.enableShowDanmaku.value = newVal;
+          final newVal = !plPlayerController.enableShowDanmakuAdaptive.value;
+          plPlayerController.enableShowDanmakuAdaptive.value = newVal;
           if (!plPlayerController.tempPlayerConf) {
             GStorage.setting.put(
               plPlayerController.isLive

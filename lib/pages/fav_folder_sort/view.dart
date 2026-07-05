@@ -57,7 +57,6 @@ class _FavFolderSortPageState extends State<FavFolderSortPage>
   }
 
   void onReorderItem(int oldIndex, int newIndex) {
-    if (newIndex > oldIndex) newIndex--;
     if (oldIndex == 0 || newIndex == 0) {
       SmartDialog.showToast('默认收藏夹不支持排序');
       return;
@@ -70,7 +69,7 @@ class _FavFolderSortPageState extends State<FavFolderSortPage>
 
   Widget get _buildBody {
     return ReorderableListView.builder(
-      onReorder: onReorderItem,
+      onReorderItem: onReorderItem,
       proxyDecorator: proxyDecorator,
       physics: const AlwaysScrollableScrollPhysics(),
       itemCount: sortList.length,
@@ -82,7 +81,7 @@ class _FavFolderSortPageState extends State<FavFolderSortPage>
         final key = item.id.toString();
         return SizedBox(
           key: Key(key),
-          height: 98,
+          height: 110,
           child: FavVideoItem(
             heroTag: key,
             item: item,

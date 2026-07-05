@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/custom_icon.dart';
 import 'package:PiliPlus/http/fav.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/user.dart';
@@ -40,45 +41,40 @@ class MineController extends CommonDataController<FavFolderData, FavFolderData>
   static RxBool anonymity =
       (Accounts.account.isNotEmpty && !Accounts.heartbeat.isLogin).obs;
 
-  late final list =
-      <({IconData icon, double size, String title, VoidCallback onTap})>[
-        (
-          size: 23,
-          icon: MdiIcons.folderDownloadOutline,
-          title: '离线缓存',
-          onTap: () => Get.toNamed('/download'),
-        ),
-        (
-          size: 23,
-          icon: Icons.history,
-          title: '观看记录',
-          onTap: () {
-            if (isLogin) {
-              Get.toNamed('/history');
-            }
-          },
-        ),
-        (
-          size: 20,
-          icon: Icons.subscriptions_outlined,
-          title: '我的订阅',
-          onTap: () {
-            if (isLogin) {
-              Get.toNamed('/subscription');
-            }
-          },
-        ),
-        (
-          size: 21,
-          icon: Icons.watch_later_outlined,
-          title: '稍后再看',
-          onTap: () {
-            if (isLogin) {
-              Get.toNamed('/later');
-            }
-          },
-        ),
-      ];
+  late final list = <({IconData icon, String title, VoidCallback onTap})>[
+    (
+      icon: CustomIcons.folderDownloadOutline,
+      title: '离线缓存',
+      onTap: () => Get.toNamed('/download'),
+    ),
+    (
+      icon: CustomIcons.history,
+      title: '观看记录',
+      onTap: () {
+        if (isLogin) {
+          Get.toNamed('/history');
+        }
+      },
+    ),
+    (
+      icon: CustomIcons.subscriptions_outlined,
+      title: '我的订阅',
+      onTap: () {
+        if (isLogin) {
+          Get.toNamed('/subscription');
+        }
+      },
+    ),
+    (
+      icon: CustomIcons.watch_later_outlined,
+      title: '稍后再看',
+      onTap: () {
+        if (isLogin) {
+          Get.toNamed('/later');
+        }
+      },
+    ),
+  ];
 
   @override
   void onInit() {
@@ -86,13 +82,6 @@ class MineController extends CommonDataController<FavFolderData, FavFolderData>
     UserInfoData? userInfoCache = Pref.userInfoCache;
     if (userInfoCache != null) {
       userInfo.value = userInfoCache;
-    }
-    // Refresh whenever we actually hold credentials, not only when a cached
-    // profile exists. Otherwise a valid session whose profile cache is missing
-    // (e.g. cookies imported, or a cache write that never landed) stays stuck
-    // showing "点击登录" forever, because queryUserInfo — which sets isLogin and
-    // repopulates the cache — would never run.
-    if (userInfoCache != null || Accounts.main.isLogin) {
       queryData();
       queryUserInfo();
     }
