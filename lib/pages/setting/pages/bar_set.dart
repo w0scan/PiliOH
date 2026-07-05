@@ -78,7 +78,7 @@ class _BarSetPageState extends State<BarSetPage> with ReorderMixin {
         ],
       ),
       body: ReorderableListView(
-        onReorderItem: onReorderItem,
+        onReorder: onReorderItem,
         proxyDecorator: proxyDecorator,
         footer: Padding(
           padding: padding,

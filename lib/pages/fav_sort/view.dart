@@ -97,7 +97,7 @@ class _FavSortPageState extends State<FavSortPage> with ReorderMixin {
 
   Widget get _buildBody {
     final child = ReorderableListView.builder(
-      onReorderItem: onReorderItem,
+      onReorder: onReorderItem,
       proxyDecorator: proxyDecorator,
       physics: const AlwaysScrollableScrollPhysics(),
       padding:

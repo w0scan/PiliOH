@@ -538,7 +538,7 @@ class VideoDetailController extends GetxController
   bool get preInitPlayer => plPlayerController.preInitPlayer;
   @override
   int get currPosInMilliseconds =>
-      defaultST?.inMilliseconds ?? plPlayerController.position.inMilliseconds;
+      defaultST?.inMilliseconds ?? plPlayerController.positionInMilliseconds;
   @override
   Future<void> seekTo(Duration duration, {required bool isSeek}) =>
       plPlayerController.seekTo(duration, isSeek: isSeek);
@@ -549,11 +549,7 @@ class VideoDetailController extends GetxController
   ValueChanged<Duration>? _blockPosListener;
 
   @override
-  bool get hasBlockListener => _blockPosListener != null;
-
-  @override
   void startBlockListener() {
-    cancelBlockListener();
     _blockPosListener = onBlockPosition;
     plPlayerController.addPositionListener(_blockPosListener!);
   }
@@ -644,7 +640,7 @@ class VideoDetailController extends GetxController
           final child = SendDanmakuPanel(
             cid: cid.value,
             bvid: bvid,
-            progress: plPlayerController.position.inMilliseconds,
+            progress: plPlayerController.positionInMilliseconds,
             initialValue: savedDanmaku,
             onSave: (danmaku) => savedDanmaku = danmaku,
             onSuccess: (danmakuModel) {
@@ -1001,7 +997,7 @@ class VideoDetailController extends GetxController
         PostSegmentModel(
           segment: Pair(
             first: 0,
-            second: plPlayerController.position.inMilliseconds / 1000,
+            second: plPlayerController.positionInMilliseconds / 1000,
           ),
           category: SegmentType.sponsor,
           actionType: ActionType.skip,

@@ -69,7 +69,7 @@ class _FavFolderSortPageState extends State<FavFolderSortPage>
 
   Widget get _buildBody {
     return ReorderableListView.builder(
-      onReorderItem: onReorderItem,
+      onReorder: onReorderItem,
       proxyDecorator: proxyDecorator,
       physics: const AlwaysScrollableScrollPhysics(),
       itemCount: sortList.length,

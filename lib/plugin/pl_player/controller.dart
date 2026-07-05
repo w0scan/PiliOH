@@ -1869,13 +1869,10 @@ class PlPlayerController with BlockConfigMixin {
         context: Get.context!,
         builder: (context) => GestureDetector(
           onTap: () async {
-            final bytes = await image.toByteData(format: .png);
-            if (bytes != null) {
-              ImageUtils.saveByteImg(
-                bytes: bytes.buffer.asUint8List(),
-                fileName: 'screenshot_${cid}_$time',
-              );
-            }
+            ImageUtils.saveByteImg(
+              bytes: image,
+              fileName: 'screenshot_${cid}_$time',
+            );
             Get.back();
           },
           child: Align(
@@ -1895,14 +1892,14 @@ class PlPlayerController with BlockConfigMixin {
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(5),
-                    child: RawImage(image: image),
+                    child: Image.memory(image),
                   ),
                 ),
               ),
             ),
           ),
         ),
-      ).whenComplete(image.dispose);
+      );
     } else {
       SmartDialog.showToast('截图失败');
     }

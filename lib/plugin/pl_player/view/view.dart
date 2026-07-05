@@ -2024,9 +2024,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
                 ? plPlayerController.nativeVideoSize.value!.width /
                     plPlayerController.nativeVideoSize.value!.height
                 : 16 / 9,
-            child: NativePlayerPlatformView(
-              plPlayerController: plPlayerController,
-            ),
+            child: NativePlayerPlatformView(),
           ),
         ),
       );

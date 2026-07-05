@@ -1286,7 +1286,7 @@ class HeaderControlState extends State<HeaderControl>
   /// 字幕设置
   void showSetSubtitle() {
     showBottomSheet(
-      padding: () => isFullScreen ? const .only(bottom: 70) : .zero,
+      padding: isFullScreen ? 70 : null,
       (context, setState) {
         final theme = Theme.of(context);
 

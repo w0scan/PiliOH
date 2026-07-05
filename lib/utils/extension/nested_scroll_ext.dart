@@ -11,9 +11,10 @@ extension ExtendedNestedScrollViewStateExt on ExtendedNestedScrollViewState {
 
   void animToTop() {
     if (mounted) {
-      final position = innerNestedPositions.first;
+      final position = innerPositions.first;
       if (position.pixels >= position.viewportDimension * 7) {
-        position.localJumpTo(0);
+        // localJumpTo is on _NestedScrollPosition (private type), use dynamic dispatch
+        (position as dynamic).localJumpTo(0);
       } else {
         outerController.animateTo(
           outerController.offset,

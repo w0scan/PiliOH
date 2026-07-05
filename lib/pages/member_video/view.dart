@@ -61,7 +61,7 @@ class _MemberVideoState extends State<MemberVideo>
         tag: widget.heroTag,
       ).scrollKey.currentState;
       if (state != null && state.mounted) {
-        state.innerNestedPositions.first.localJumpTo(scrollOffset);
+        (state.innerPositions.first as dynamic).localJumpTo(scrollOffset);
       }
     } catch (e) {
       if (kDebugMode) debugPrint('jump error: $e');
