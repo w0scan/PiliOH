@@ -663,8 +663,13 @@ class PlPlayerController with BlockConfigMixin {
         return;
       }
 
-      updateDuration(duration ?? _videoPlayerController!.state.duration);
-      position.value = buffered.value = seekTo?.inSeconds ?? 0;
+      if (isNativePlayer) {
+        // 原生播放器路径：duration 由 onDuration 回调更新
+        position.value = buffered.value = seekTo?.inSeconds ?? 0;
+      } else {
+        updateDuration(duration ?? _videoPlayerController!.state.duration);
+        position.value = buffered.value = seekTo?.inSeconds ?? 0;
+      }
 
       dataStatus.value = .loaded;
 
@@ -1022,6 +1027,8 @@ class PlPlayerController with BlockConfigMixin {
     // 设置倍速
     if (isLive) {
       await setPlaybackSpeed(1.0);
+    } else if (isNativePlayer) {
+      await setPlaybackSpeed(_playbackSpeed.value);
     } else {
       if (_videoPlayerController?.state.rate != _playbackSpeed.value) {
         await setPlaybackSpeed(_playbackSpeed.value);

@@ -1239,7 +1239,8 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       () =>
           !videoDetailController.videoState.value ||
               !videoDetailController.autoPlay ||
-              plPlayerController?.videoController == null
+              (plPlayerController?.videoController == null &&
+                  !(plPlayerController?.isNativePlayer ?? false))
           ? const SizedBox.shrink()
           : PLVideoPlayer(
               maxWidth: width,
