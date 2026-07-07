@@ -940,6 +940,9 @@ class PlPlayerController with BlockConfigMixin {
       WakelockPlus.toggle(enable: playing);
       playerStatus.value = playing ? .playing : .paused;
       if (playing) {
+        // AVPlayer 从 preparing/buffering 过渡到 playing 时不一定发送 BUFFERING_END，
+        // 需要在此重置，否则加载指示器会一直显示
+        isBuffering.value = false;
         _nativeWatch
           ..reset()
           ..start();
