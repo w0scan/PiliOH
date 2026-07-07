@@ -18,7 +18,7 @@ temp_file=$(mktemp)
 while IFS= read -r line || [ -n "$line" ]; do
     if [[ "$line" =~ ^[[:space:]]*version:[[:space:]]*([[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+) ]]; then
         versionName="${BASH_REMATCH[1]}"
-        if [[ "$Arg" == "android" ]]; then
+        if [[ "$Arg" == "ohos" ]]; then
             versionName="${versionName}-${commitHash:0:9}"
         fi
         echo "version: ${versionName}+${versionCode}"
