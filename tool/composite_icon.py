@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Composite a transparent PNG icon onto a white background for OHOS."""
+"""Composite a transparent PNG icon onto a white background for OHOS.
+Usage: python3 tool/composite_icon.py <src_rgba.png> <dst_rgb.png>
+"""
 from PIL import Image
 import sys
 
