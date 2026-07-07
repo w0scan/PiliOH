@@ -11,7 +11,7 @@ import 'package:flutter/widgets.dart';
 /// Embeds the native dual-AVPlayer's XComponent using SURFACE composition
 /// (initSurfaceOhosView) rather than texture composition. Surface composition
 /// composes the platform view in the native view hierarchy, avoiding the
-/// Flutter-texture EGL context conflict that produced a black frame.
+/// Flutter-texture EGL/OH_NativeImage conflict that produced a black frame.
 class NativePlayerPlatformView extends StatelessWidget {
   const NativePlayerPlatformView({super.key});
 

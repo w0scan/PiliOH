@@ -109,11 +109,13 @@ export default class NativeDualPlayer implements FlutterPlugin {
 
   onViewSurfaceReady(surfaceId: string): void {
     this.surfaceId = surfaceId;
+    Log.i(TAG, 'onViewSurfaceReady: surfaceId=' + surfaceId + ', videoPlayer=' + (this.videoPlayer !== null) + ', pendingInit=' + (this.pendingInit !== null));
     // If already playing (e.g. fullscreen rebuild recreated the XComponent),
     // just rebind the new surface to the live video player.
     if (this.videoPlayer !== null && this.pendingInit === null) {
       try {
         this.videoPlayer.surfaceId = surfaceId;
+        Log.i(TAG, 'onViewSurfaceReady: rebound surface to existing player');
       } catch (e) {
         Log.e(TAG, 'rebind surface failed: ' + JSON.stringify(e));
       }
@@ -124,6 +126,7 @@ export default class NativeDualPlayer implements FlutterPlugin {
 
   onViewSurfaceDestroyed(): void {
     this.surfaceId = '';
+    Log.i(TAG, 'onViewSurfaceDestroyed');
   }
 
   // -------------------------------------------------------------------------
@@ -199,6 +202,7 @@ export default class NativeDualPlayer implements FlutterPlugin {
     this.syncMaster = (call.argument('syncMaster') as number) ?? MASTER_AUDIO;
     this.syncThresholdMs =
       (call.argument('syncThresholdMs') as number) ?? 2000;
+    Log.i(TAG, 'setSource: video=' + videoUrl.substring(0, Math.min(videoUrl.length, 60)) + '..., audio=' + (audioUrl != null ? 'yes' : 'no') + ', startMs=' + this.startMs + ', surfaceId=' + this.surfaceId);
     this.pendingInit = { videoUrl, audioUrl };
     this.tryStart();
     result.success(null);
@@ -209,9 +213,11 @@ export default class NativeDualPlayer implements FlutterPlugin {
   private tryStart(): void {
     const init = this.pendingInit;
     if (init === null || this.surfaceId.length === 0) {
+      Log.i(TAG, 'tryStart: pending=' + (init !== null) + ', surfaceId=' + this.surfaceId + ' (waiting)');
       return;
     }
     this.pendingInit = null;
+    Log.i(TAG, 'tryStart: starting setupPlayers');
     const gen = ++this.genId;
     this.runExclusive((): Promise<void> => {
       if (gen !== this.genId) {
@@ -244,17 +250,22 @@ export default class NativeDualPlayer implements FlutterPlugin {
     videoSrc: string,
     audioSrc: string | null,
   ): Promise<void> {
+    Log.i(TAG, 'setupPlayers: start');
     this.videoPlayer = await media.createAVPlayer();
     this.bindVideoEvents(this.videoPlayer);
+    Log.i(TAG, 'setupPlayers: video player created, applying source');
     await this.applySource(this.videoPlayer, videoSrc);
 
     if (audioSrc != null && audioSrc.length > 0) {
       this.audioPlayer = await media.createAVPlayer();
       this.bindAudioEvents(this.audioPlayer);
+      Log.i(TAG, 'setupPlayers: audio player created, applying source');
       await this.applySource(this.audioPlayer, audioSrc);
     } else {
       this.audioReady = true;
+      Log.i(TAG, 'setupPlayers: no audio track, audioReady=true');
     }
+    Log.i(TAG, 'setupPlayers: done, videoReady=' + this.videoReady + ', audioReady=' + this.audioReady);
   }
 
   private async applySource(player: media.AVPlayer, src: string): Promise<void> {
@@ -286,6 +297,7 @@ export default class NativeDualPlayer implements FlutterPlugin {
       if (p !== this.videoPlayer) {
         return;
       }
+      Log.i(TAG, 'video stateChange: ' + state);
       if (state === 'initialized') {
         p.surfaceId = this.surfaceId;
         p.prepare();
@@ -299,13 +311,19 @@ export default class NativeDualPlayer implements FlutterPlugin {
         }
         p.setVolume(this.audioPlayer !== null ? 0 : 1);
         this.videoReady = true;
+        Log.i(TAG, 'video prepared, videoReady=true, calling maybeStart');
         this.maybeStart();
       } else if (state === 'playing') {
+        Log.i(TAG, 'video playing → onPlayingChanged(true)');
         this.channel?.invokeMethod('onPlayingChanged', true);
       } else if (state === 'paused') {
+        Log.i(TAG, 'video paused → onPlayingChanged(false)');
         this.channel?.invokeMethod('onPlayingChanged', false);
       } else if (state === 'completed') {
+        Log.i(TAG, 'video completed → onCompleted');
         this.channel?.invokeMethod('onCompleted', null);
+      } else if (state === 'stopped' || state === 'released' || state === 'idle') {
+        Log.i(TAG, 'video state: ' + state);
       }
     });
 
@@ -356,10 +374,12 @@ export default class NativeDualPlayer implements FlutterPlugin {
       if (p !== this.audioPlayer) {
         return;
       }
+      Log.i(TAG, 'audio stateChange: ' + state);
       if (state === 'initialized') {
         p.prepare();
       } else if (state === 'prepared') {
         this.audioReady = true;
+        Log.i(TAG, 'audio prepared, audioReady=true, calling maybeStart');
         this.maybeStart();
       }
     });
@@ -377,8 +397,10 @@ export default class NativeDualPlayer implements FlutterPlugin {
   // -------------------------------------------------------------------------
   private maybeStart(): void {
     if (!(this.videoReady && this.audioReady)) {
+      Log.i(TAG, 'maybeStart: videoReady=' + this.videoReady + ', audioReady=' + this.audioReady + ' (waiting)');
       return;
     }
+    Log.i(TAG, 'maybeStart: both ready, wantPlay=' + this.wantPlay + ', startMs=' + this.startMs + ', startSeekDone=' + this.startSeekDone);
     if (!this.startSeekDone && this.startMs > 0) {
       this.startSeekDone = true;
       this.videoPlayer?.seek(this.startMs, media.SeekMode.SEEK_CLOSEST);

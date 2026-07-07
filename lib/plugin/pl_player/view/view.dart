@@ -2013,18 +2013,56 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
 
   Widget get _videoWidget {
     if (plPlayerController.isNativePlayer) {
+      // Native dual-AVPlayer renders into an XComponent hosted by this
+      // platform view.  Use a const widget so the PlatformViewLink is NOT
+      // rebuilt when reactive state changes — rebuilding would destroy and
+      // recreate the XComponent surface, breaking playback.
       return Container(
         clipBehavior: Clip.none,
         width: maxWidth,
         height: maxHeight,
         color: widget.fill,
         child: Obx(
-          () => AspectRatio(
-            aspectRatio: plPlayerController.nativeVideoSize.value != null
-                ? plPlayerController.nativeVideoSize.value!.width /
-                    plPlayerController.nativeVideoSize.value!.height
-                : 16 / 9,
-            child: NativePlayerPlatformView(),
+          () => MouseInteractiveViewer(
+            scaleEnabled: !plPlayerController.controlsLock.value,
+            pointerSignalFallback: _onPointerSignal,
+            onPointerPanZoomUpdate: _onPointerPanZoomUpdate,
+            onPointerPanZoomEnd: _onPointerPanZoomEnd,
+            onPointerDown: _onPointerDown,
+            onPanStart: _onPanStart,
+            onPanUpdate: _onPanUpdate,
+            onPanEnd: _onPanEnd,
+            onScaleUpdate: _onScaleUpdate,
+            scaleGestureRecognizer: _scaleGestureRecognizer,
+            panEnabled: false,
+            minScale: plPlayerController.enableShrinkVideoSize ? 0.75 : 1,
+            maxScale: 2.0,
+            boundaryMargin: plPlayerController.enableShrinkVideoSize
+                ? const .all(double.infinity)
+                : .zero,
+            panAxis: .aligned,
+            transformationController: _transformationController,
+            childKey: _videoKey,
+            child: RepaintBoundary(
+              key: _videoKey,
+              child: Obx(
+                () {
+                  final videoFit = plPlayerController.videoFit.value;
+                  const view = NativePlayerPlatformView();
+                  final w = plPlayerController.width ?? 0;
+                  final h = plPlayerController.height ?? 0;
+                  if (w <= 0 || h <= 0) {
+                    return view;
+                  }
+                  return Center(
+                    child: AspectRatio(
+                      aspectRatio: w / h,
+                      child: view,
+                    ),
+                  );
+                },
+              ),
+            ),
           ),
         ),
       );

@@ -181,7 +181,7 @@ class PlPlayerController with BlockConfigMixin {
 
   late final RxBool flipY = false.obs;
 
-  final RxBool isBuffering = true.obs;
+  final RxBool isBuffering = false.obs;
 
   /// 全屏方向
   bool get isVertical => _isVertical;
@@ -631,6 +631,7 @@ class PlPlayerController with BlockConfigMixin {
       // _playbackSpeed.value = speed;
       // 初始化数据加载状态
       dataStatus.value = DataStatus.loading;
+      debugPrint('[NativePlayer] switchDataSource: isNativePlayer=$isNativePlayer, dataStatus=loading');
       // 初始化全屏方向
       _isVertical = isVertical ?? false;
       _aid = aid;
@@ -672,6 +673,7 @@ class PlPlayerController with BlockConfigMixin {
       }
 
       dataStatus.value = .loaded;
+      debugPrint('[NativePlayer] switchDataSource: dataStatus=loaded, isBuffering=${isBuffering.value}, playerStatus=${playerStatus.value}');
 
       if (autoFullScreenFlag && autoEnterFullScreen) {
         triggerFullScreen(status: true);
@@ -889,6 +891,7 @@ class PlPlayerController with BlockConfigMixin {
     Duration? seekTo,
   ) async {
     _setupNativeCallbacks();
+    debugPrint('[NativePlayer] _createNativePlayer start, autoPlay=$_autoPlay');
 
     String video = dataSource.videoSource;
     String? audio = dataSource.audioSource;
@@ -896,6 +899,7 @@ class PlPlayerController with BlockConfigMixin {
       video = audio;
       audio = null;
     }
+    debugPrint('[NativePlayer] setSource: video=${video.substring(0, video.length > 80 ? 80 : video.length)}..., audio=${audio != null ? "yes" : "no"}, startMs=${seekTo?.inMilliseconds ?? 0}');
     await OhosNativePlayer.setSource(
       videoUrl: video,
       audioUrl: audio,
@@ -909,13 +913,19 @@ class PlPlayerController with BlockConfigMixin {
       width: width ?? 0,
       height: height ?? 0,
     );
+    debugPrint('[NativePlayer] setSource done');
     if (_autoPlay) {
+      debugPrint('[NativePlayer] calling OhosNativePlayer.play()');
       await OhosNativePlayer.play();
+      debugPrint('[NativePlayer] OhosNativePlayer.play() done');
     }
+    debugPrint('[NativePlayer] _createNativePlayer end, isBuffering=${isBuffering.value}, playerStatus=${playerStatus.value}, dataStatus=${dataStatus.value}');
   }
 
   void _setupNativeCallbacks() {
+    debugPrint('[NativePlayer] _setupNativeCallbacks');
     OhosNativePlayer.onPosition = (ms) {
+      debugPrint('[NativePlayer] onPosition: $ms ms');
       _nativePosBase = Duration(milliseconds: ms);
       _nativeWatch
         ..reset()
@@ -923,12 +933,15 @@ class PlPlayerController with BlockConfigMixin {
       _applyNativePosition(_nativePosBase);
     };
     OhosNativePlayer.onDuration = (ms) {
+      debugPrint('[NativePlayer] onDuration: $ms ms');
       updateDuration(Duration(milliseconds: ms));
     };
     OhosNativePlayer.onBuffered = (ms) {
+      debugPrint('[NativePlayer] onBuffered: $ms ms');
       buffered.value = ms ~/ 1000;
     };
     OhosNativePlayer.onBuffering = (event) {
+      debugPrint('[NativePlayer] onBuffering: $event (isBuffering was ${isBuffering.value})');
       isBuffering.value = event;
       videoPlayerServiceHandler?.onStatusChange(
         playerStatus.value,
@@ -937,6 +950,7 @@ class PlPlayerController with BlockConfigMixin {
       );
     };
     OhosNativePlayer.onPlayingChanged = (playing) {
+      debugPrint('[NativePlayer] onPlayingChanged: $playing (isBuffering=${isBuffering.value}, playerStatus was ${playerStatus.value})');
       WakelockPlus.toggle(enable: playing);
       playerStatus.value = playing ? .playing : .paused;
       if (playing) {
@@ -950,6 +964,7 @@ class PlPlayerController with BlockConfigMixin {
       } else {
         _nativeWatch.stop();
       }
+      debugPrint('[NativePlayer] onPlayingChanged done: playerStatus=${playerStatus.value}, isBuffering=${isBuffering.value}');
       for (final element in _statusListeners) {
         element(playerStatus.value);
       }
@@ -960,6 +975,7 @@ class PlPlayerController with BlockConfigMixin {
       );
     };
     OhosNativePlayer.onCompleted = () {
+      debugPrint('[NativePlayer] onCompleted');
       playerStatus.value = .completed;
       _nativeWatch.stop();
       for (final element in _statusListeners) {
@@ -968,9 +984,13 @@ class PlPlayerController with BlockConfigMixin {
       makeHeartBeat(-1, type: .completed);
     };
     OhosNativePlayer.onError = (msg) {
-      if (kDebugMode) debugPrint('native player error: $msg');
+      debugPrint('[NativePlayer] onError: $msg');
+      isBuffering.value = false;
+      dataStatus.value = DataStatus.error;
+      playerStatus.value = PlayerStatus.paused;
     };
     OhosNativePlayer.onVideoSize = (w, h) {
+      debugPrint('[NativePlayer] onVideoSize: $w x $h');
       width = w;
       height = h;
       nativeVideoSize.value = Size(w.toDouble(), h.toDouble());
@@ -1027,6 +1047,7 @@ class PlPlayerController with BlockConfigMixin {
   // 开始播放
   Future<void> _initializePlayer() async {
     if (_instance == null) return;
+    debugPrint('[NativePlayer] _initializePlayer: isNativePlayer=$isNativePlayer, isBuffering=${isBuffering.value}, playerStatus=${playerStatus.value}');
     // 设置倍速
     if (isLive) {
       await setPlaybackSpeed(1.0);
@@ -1049,9 +1070,11 @@ class PlPlayerController with BlockConfigMixin {
 
     // 自动播放
     if (_autoPlay) {
+      debugPrint('[NativePlayer] _initializePlayer: calling playIfExists()');
       playIfExists();
       // await play(duration: duration);
     }
+    debugPrint('[NativePlayer] _initializePlayer done: isBuffering=${isBuffering.value}, playerStatus=${playerStatus.value}');
   }
 
   List<StreamSubscription>? _subscriptions;
@@ -1310,6 +1333,7 @@ class PlPlayerController with BlockConfigMixin {
   /// 播放视频
   Future<void> play({bool repeat = false, bool hideControls = true}) async {
     if (_playerCount == 0) return;
+    debugPrint('[NativePlayer] play: isNativePlayer=$isNativePlayer, isBuffering=${isBuffering.value}, playerStatus=${playerStatus.value}');
     // 播放时自动隐藏控制条
     controls = !hideControls;
     // repeat为true，将从头播放
@@ -1321,6 +1345,10 @@ class PlPlayerController with BlockConfigMixin {
     await _videoPlayerController?.play();
     if (isNativePlayer) {
       await OhosNativePlayer.play();
+      // 原生播放器：play() 仅设置 wantPlay=true，实际播放异步进行。
+      // 重置 isBuffering 避免旧的缓冲状态导致加载指示器一直显示；
+      // 原生回调 onBuffering/onPlayingChanged 会在实际状态变化时更新。
+      isBuffering.value = false;
     }
 
     audioSessionHandler?.setActive(true);

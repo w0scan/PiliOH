@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
 
 import 'package:PiliPlus/common/constants.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
@@ -98,7 +99,7 @@ abstract final class VideoHttp {
       'device_type': 0,
       'disable_rcmd': 0,
       'flush': 5,
-      'fnval': 976,
+      'fnval': Platform.isOhos ? 976 & ~128 : 976,
       'fnver': 0,
       'force_host': 2, //使用https
       'fourk': 1,
@@ -220,7 +221,7 @@ abstract final class VideoHttp {
       'cid': cid,
       'qn': qn ?? 80,
       // 获取所有格式的视频
-      'fnval': 4048,
+      'fnval': Platform.isOhos ? 4048 & ~128 : 4048,
       'fourk': 1,
       'fnver': 0,
       'voice_balance': voiceBalance ? 1 : 0,
