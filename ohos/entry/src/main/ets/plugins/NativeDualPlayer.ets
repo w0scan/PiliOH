@@ -9,7 +9,7 @@ import {
   MethodResult,
 } from '@ohos/flutter_ohos';
 import type { BusinessError } from '@ohos.base';
-import { NativePlayerViewFactory } from './NativePlayerView';
+import { NativePlayerViewFactory, NativePlayerView } from './NativePlayerView';
 
 const TAG = 'NativeDualPlayer';
 
@@ -80,6 +80,15 @@ export default class NativeDualPlayer implements FlutterPlugin {
 
   private openedFds: OpenedFile[] = [];
 
+  // Video dimensions (updated on prepared / widthUpdate), used to calculate
+  // letterbox surface rect so the video isn't stretched on fullscreen.
+  private videoWidth: number = 0;
+  private videoHeight: number = 0;
+
+  // Reference to the PlatformView factory so we can reach the current
+  // NativePlayerView and call setXComponentSurfaceRect on its controller.
+  private viewFactory: NativePlayerViewFactory | null = null;
+
   getUniqueClassName(): string {
     return 'NativeDualPlayer';
   }
@@ -95,7 +104,9 @@ export default class NativeDualPlayer implements FlutterPlugin {
       },
     });
     const reg = binding.getPlatformViewRegistry();
-    reg?.registerViewFactory(VIEW_TYPE, new NativePlayerViewFactory(this));
+    const factory = new NativePlayerViewFactory(this);
+    reg?.registerViewFactory(VIEW_TYPE, factory);
+    this.viewFactory = factory;
     Log.i(TAG, 'attached');
   }
 
@@ -115,6 +126,15 @@ export default class NativeDualPlayer implements FlutterPlugin {
     if (this.videoPlayer !== null && this.pendingInit === null) {
       try {
         this.videoPlayer.surfaceId = surfaceId;
+        // Re-apply video scale type after surface rebinding to prevent
+        // video stretching when the XComponent is recreated (e.g. fullscreen).
+        try {
+          this.videoPlayer.videoScaleType = media.VideoScaleType.VIDEO_SCALE_TYPE_FIT;
+        } catch (e) {
+          Log.e(TAG, 're-apply videoScaleType failed: ' + JSON.stringify(e));
+        }
+        // Re-apply letterbox surface rect after surface rebinding.
+        this.refreshSurfaceRect();
         Log.i(TAG, 'onViewSurfaceReady: rebound surface to existing player');
       } catch (e) {
         Log.e(TAG, 'rebind surface failed: ' + JSON.stringify(e));
@@ -127,6 +147,76 @@ export default class NativeDualPlayer implements FlutterPlugin {
   onViewSurfaceDestroyed(): void {
     this.surfaceId = '';
     Log.i(TAG, 'onViewSurfaceDestroyed');
+  }
+
+  // Called by NativePlayerView when the XComponent layout area changes
+  // (e.g. fullscreen toggle).  Recalculates the letterbox surface rect so
+  // the video keeps its aspect ratio instead of being stretched.
+  updateSurfaceRect(containerWidth: number, containerHeight: number): void {
+    if (this.videoWidth <= 0 || this.videoHeight <= 0) {
+      return;
+    }
+    const view = this.viewFactory?.currentView;
+    if (view === null || view === undefined) {
+      return;
+    }
+    this.applySurfaceRect(view, containerWidth, containerHeight);
+  }
+
+  // Recalculate and apply the letterbox surface rect using the current
+  // container dimensions (from the NativePlayerView's cached area).
+  refreshSurfaceRect(): void {
+    if (this.videoWidth <= 0 || this.videoHeight <= 0) {
+      return;
+    }
+    const view = this.viewFactory?.currentView;
+    if (view === null || view === undefined) {
+      return;
+    }
+    const cw = view.containerWidth;
+    const ch = view.containerHeight;
+    if (cw <= 0 || ch <= 0) {
+      return;
+    }
+    this.applySurfaceRect(view, cw, ch);
+  }
+
+  private applySurfaceRect(view: NativePlayerView, cw: number, ch: number): void {
+    const vw = this.videoWidth;
+    const vh = this.videoHeight;
+    // Calculate letterbox rect: fit the video inside the container while
+    // preserving aspect ratio, centering the result.
+    const videoRatio = vw / vh;
+    const containerRatio = cw / ch;
+    let surfaceWidth: number;
+    let surfaceHeight: number;
+    let offsetX: number = 0;
+    let offsetY: number = 0;
+    if (videoRatio > containerRatio) {
+      // Video wider than container → fit width, letterbox top/bottom
+      surfaceWidth = cw;
+      surfaceHeight = cw / videoRatio;
+      offsetY = (ch - surfaceHeight) / 2;
+    } else {
+      // Video taller than container → fit height, pillarbox left/right
+      surfaceHeight = ch;
+      surfaceWidth = ch * videoRatio;
+      offsetX = (cw - surfaceWidth) / 2;
+    }
+    const rect: SurfaceRect = {
+      offsetX: Math.round(offsetX),
+      offsetY: Math.round(offsetY),
+      surfaceWidth: Math.round(surfaceWidth),
+      surfaceHeight: Math.round(surfaceHeight),
+    };
+    Log.i(TAG, 'applySurfaceRect: container=' + cw + 'x' + ch +
+      ', video=' + vw + 'x' + vh +
+      ', rect=' + JSON.stringify(rect));
+    try {
+      view.xController.setXComponentSurfaceRect(rect);
+    } catch (e) {
+      Log.e(TAG, 'setXComponentSurfaceRect failed: ' + JSON.stringify(e));
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -308,6 +398,17 @@ export default class NativeDualPlayer implements FlutterPlugin {
           p.videoScaleType = media.VideoScaleType.VIDEO_SCALE_TYPE_FIT;
         } catch (e) {
           Log.e(TAG, 'setVideoScaleType failed: ' + JSON.stringify(e));
+        }
+        // Capture video dimensions and notify Dart side.
+        try {
+          this.videoWidth = p.width;
+          this.videoHeight = p.height;
+          Log.i(TAG, 'video prepared: size=' + this.videoWidth + 'x' + this.videoHeight);
+          this.channel?.invokeMethod('onVideoSize', { w: this.videoWidth, h: this.videoHeight });
+          // Now that we know the video size, apply letterbox surface rect.
+          this.refreshSurfaceRect();
+        } catch (e) {
+          Log.e(TAG, 'get video size failed: ' + JSON.stringify(e));
         }
         p.setVolume(this.audioPlayer !== null ? 0 : 1);
         this.videoReady = true;

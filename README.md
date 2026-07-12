@@ -8,9 +8,9 @@
     <h1>PiliPlus</h1>
 <div align="center">
     
-![GitHub repo size](https://img.shields.io/github/repo-size/bggRGjQaUbCoE/PiliPlus) 
-![GitHub Repo stars](https://img.shields.io/github/stars/bggRGjQaUbCoE/PiliPlus) 
-![GitHub all releases](https://img.shields.io/github/downloads/bggRGjQaUbCoE/PiliPlus/total) 
+![GitHub repo size](https://img.shields.io/github/repo-size/w0scan/PiliPlusOHOS) 
+![GitHub Repo stars](https://img.shields.io/github/stars/w0scan/PiliPlusOHOS) 
+![GitHub all releases](https://img.shields.io/github/downloads/w0scan/PiliPlusOHOS/total) 
 </div>
     <p>使用Flutter开发的BiliBili第三方客户端</p>
     
@@ -27,11 +27,8 @@
 
 ## 适配平台
 
-- [x] Android
-- [x] iOS
-- [x] Pad
-- [x] Windows
-- [x] Linux
+
+- [x] OHOS
 
 [![Packaging status](https://repology.org/badge/vertical-allrepos/piliplus.svg)](https://repology.org/project/piliplus/versions)
 
@@ -43,6 +40,8 @@
 
 ## feat
 
+- [x] 原生鸿蒙播放器
+- [x] 鸿蒙mpv播放器
 - [x] 编辑动态
 - [x] DLNA 投屏
 - [x] 离线缓存/播放
@@ -211,6 +210,68 @@
 
 <br/>
 
+## 编译 （在mac为例）
+```bash
+git clone git@github.com:w0scan/PiliPlusOHOS.git
+git clone --depth 1 --branch 3.41.10-ohos-0.0.1-canary1 \
+                https://gitcode.com/openharmony-tpc/flutter_flutter.git
+cd flutter_flutter
+git checkout cedbd616b9
+cd ..
+```
+
+### 配置JDK 17
+
+```bash
+export JAVA_HOME=/opt/homebrew/opt/openjdk@17
+export PATH=$JAVA_HOME/bin:$PATH
+```
+
+### 配置OpenHarmony SDK, ohpm, hvigor, node
+
+```bash
+export TOOL_HOME=/Applications/DevEco-Studio.app/Contents # mac环境
+export DEVECO_SDK_HOME=$TOOL_HOME/sdk # command-line-tools/sdk
+export PATH=$TOOL_HOME/tools/ohpm/bin:$PATH # command-line-tools/ohpm/bin
+export PATH=$TOOL_HOME/tools/hvigor/bin:$PATH # command-line-tools/hvigor/bin
+export PATH=$TOOL_HOME/tools/node/bin:$PATH # command-line-tools/tool/node/bin
+```
+
+### 配置Flutter
+
+```bash
+export PUB_CACHE=$(pwd)/PUB_CACHE
+export PATH=$(pwd)/flutter_flutter/bin:$PATH
+export PUB_HOSTED_URL=https://pub.flutter-io.cn
+export FLUTTER_STORAGE_BASE_URL=https://storage.flutter-io.cn
+```
+
+### 生成版本信息 
+
+```bash
+cd PiliPlusOHOS
+bash  lib/scripts/build.sh
+```
+
+### 编译 （正式版）
+
+```bash
+flutter build hap \
+  --release \
+  --enable-experiment=private-named-parameters \
+  --dart-define-from-file=pili_release.json \
+  --pub
+```
+
+### 编译 （debug版）
+
+```bash
+flutter build hap \
+  --debug \
+  --enable-experiment=private-named-parameters \
+  --pub
+```
+
 ## 下载
 
 可以通过右侧release进行下载或拉取代码到本地进行编译
@@ -244,10 +305,10 @@
 
 ## Star History
 
-<a href="https://www.star-history.com/#bggRGjQaUbCoE/PiliPlus&Date">
+<a href="https://www.star-history.com/?type=date&repos=w0scan%2FPiliPlusOHOS">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=bggRGjQaUbCoE/PiliPlus&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=bggRGjQaUbCoE/PiliPlus&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=bggRGjQaUbCoE/PiliPlus&type=Date" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=w0scan/PiliPlusOHOS&type=date&theme=dark&legend=top-left&sealed_token=YEXdQlk8qOQAI_cBlvr8hYIe7UdL-vwhpTaWGGjUj12YtYBjI5kKz4NcFgjEqQHLaA" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=w0scan/PiliPlusOHOS&type=date&legend=top-left&sealed_token=YEXdQlk8qOQAI_cBlvr8hYIe7UdL-vwhpTaWGGjUj12YtYBjI5kKz4NcFgjEqQHLaA" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=w0scan/PiliPlusOHOS&type=date&legend=top-left&sealed_token=YEXdQlk8qOQAI_cBlvr8hYIe7UdL-vwhpTaWGGjUj12YtYBjI5kKz4NcFgjEqQHLaA" />
  </picture>
 </a>

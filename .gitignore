@@ -10,6 +10,7 @@
 .history
 .svn/
 .swiftpm/
+pili_release.json
 migrate_working_dir/
 Package.resolved
 

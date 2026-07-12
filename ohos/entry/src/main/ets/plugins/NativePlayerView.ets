@@ -30,6 +30,15 @@ struct NativePlayerXComponent {
       .onDestroy(() => {
         this.view.onSurfaceDestroyed();
       })
+      .onAreaChange((oldArea: Area, newArea: Area) => {
+        // When the layout changes (e.g. fullscreen toggle), recalculate the
+        // letterbox surface rect to preserve video aspect ratio.
+        const w = Number(newArea.width);
+        const h = Number(newArea.height);
+        if (w > 0 && h > 0) {
+          this.view.onLayoutChanged(w, h);
+        }
+      })
       .width('100%')
       .height('100%')
   }
@@ -38,6 +47,10 @@ struct NativePlayerXComponent {
 export class NativePlayerView extends PlatformView {
   xController: XComponentController = new XComponentController();
   private player: NativeDualPlayer;
+  // Cached container dimensions from onAreaChange, used by NativeDualPlayer
+  // to recalculate surface rect when video size becomes available.
+  containerWidth: number = 0;
+  containerHeight: number = 0;
 
   constructor(player: NativeDualPlayer) {
     super();
@@ -56,6 +69,12 @@ export class NativePlayerView extends PlatformView {
     this.player.onViewSurfaceDestroyed();
   }
 
+  onLayoutChanged(width: number, height: number): void {
+    this.containerWidth = width;
+    this.containerHeight = height;
+    this.player.updateSurfaceRect(width, height);
+  }
+
   dispose(): void {
     this.onSurfaceDestroyed();
   }
@@ -63,6 +82,9 @@ export class NativePlayerView extends PlatformView {
 
 export class NativePlayerViewFactory extends PlatformViewFactory {
   private player: NativeDualPlayer;
+  // The most recently created NativePlayerView, so NativeDualPlayer can
+  // reach the XComponentController to call setXComponentSurfaceRect.
+  currentView: NativePlayerView | null = null;
 
   constructor(player: NativeDualPlayer) {
     // No creation args from Dart.
@@ -71,6 +93,8 @@ export class NativePlayerViewFactory extends PlatformViewFactory {
   }
 
   create(context: common.Context, viewId: number, args: Object): PlatformView {
-    return new NativePlayerView(this.player);
+    const view = new NativePlayerView(this.player);
+    this.currentView = view;
+    return view;
   }
 }
