@@ -147,6 +147,43 @@ abstract final class OhosNativePlayer {
     } catch (_) {}
   }
 
+  /// Set media metadata for the AVSession notification bar controls.
+  static Future<void> setMediaMetadata({
+    required String title,
+    String artist = '',
+    String coverUri = '',
+    int durationMs = 0,
+    bool isLive = false,
+  }) async {
+    try {
+      await _channel.invokeMethod<void>('setMediaMetadata', {
+        'title': title,
+        'artist': artist,
+        'coverUri': coverUri,
+        'durationMs': durationMs,
+        'isLive': isLive,
+      });
+    } catch (_) {}
+  }
+
+  /// Update playback state for the AVSession notification bar controls.
+  /// [state] is one of: 'playing', 'paused', 'buffering', 'completed', 'stopped'.
+  static Future<void> updatePlaybackState({
+    required String state,
+    int positionMs = 0,
+    double speed = 1.0,
+    int bufferedMs = 0,
+  }) async {
+    try {
+      await _channel.invokeMethod<void>('updatePlaybackState', {
+        'state': state,
+        'positionMs': positionMs,
+        'speed': speed,
+        'bufferedMs': bufferedMs,
+      });
+    } catch (_) {}
+  }
+
   static Future<void> _invoke(String method) async {
     try {
       await _channel.invokeMethod<void>(method);

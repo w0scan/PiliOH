@@ -14,6 +14,7 @@ import 'package:PiliPlus/utils/android/bindings.g.dart';
 import 'package:PiliPlus/utils/image_utils.dart';
 import 'package:PiliPlus/utils/path_utils.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
+import 'package:PiliPlus/utils/ohos/ohos_native_player.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:collection/collection.dart';
 import 'package:path/path.dart' as path;
@@ -77,6 +78,16 @@ class VideoPlayerServiceHandler extends BaseAudioHandler with SeekHandler {
     //   debugPrint(StackTrace.current.toString());
     // }
     if (!mediaItem.isClosed) mediaItem.add(newMediaItem);
+    // Sync media metadata to OHOS AVSession notification bar.
+    if (Platform.isOhos) {
+      OhosNativePlayer.setMediaMetadata(
+        title: newMediaItem.title,
+        artist: newMediaItem.artist ?? '',
+        coverUri: newMediaItem.artUri?.toString() ?? '',
+        durationMs: newMediaItem.duration?.inMilliseconds ?? 0,
+        isLive: newMediaItem.isLive ?? false,
+      );
+    }
   }
 
   void setPlaybackState(
@@ -144,6 +155,28 @@ class VideoPlayerServiceHandler extends BaseAudioHandler with SeekHandler {
         PlatformDispatcher.instance.engineId!,
         isLive,
         playing,
+      );
+    }
+    // Sync playback state to OHOS AVSession notification bar.
+    if (Platform.isOhos) {
+      String state;
+      if (status.isCompleted) {
+        state = 'completed';
+      } else if (isBuffering) {
+        state = 'buffering';
+      } else if (playing) {
+        state = 'playing';
+      } else {
+        state = 'paused';
+      }
+      final pos = PlPlayerController.instance?.position.value ?? 0;
+      final speed = PlPlayerController.instance?.playbackSpeed ?? 1.0;
+      final buf = PlPlayerController.instance?.buffered.value ?? 0;
+      OhosNativePlayer.updatePlaybackState(
+        state: state,
+        positionMs: pos * 1000,
+        speed: speed,
+        bufferedMs: buf * 1000,
       );
     }
   }
@@ -293,9 +326,23 @@ class VideoPlayerServiceHandler extends BaseAudioHandler with SeekHandler {
         playing: false,
       ),
     );
+    // Clear OHOS AVSession metadata.
+    if (Platform.isOhos) {
+      OhosNativePlayer.setMediaMetadata(
+        title: '',
+        artist: '',
+        coverUri: '',
+        durationMs: 0,
+        isLive: false,
+      );
+      OhosNativePlayer.updatePlaybackState(
+        state: 'stopped',
+        positionMs: 0,
+        speed: 1.0,
+        bufferedMs: 0,
+      );
+    }
   }
-
-  void onPositionChange(Duration position) {
     if (!enableBackgroundPlay ||
         _item.isEmpty ||
         !PlPlayerController.instanceExists()) {

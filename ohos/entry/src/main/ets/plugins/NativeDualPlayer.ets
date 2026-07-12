@@ -97,6 +97,13 @@ export default class NativeDualPlayer implements FlutterPlugin {
   private avSession: avSession.AVSession | null = null;
   private bgTaskRunning: boolean = false;
 
+  // Media metadata for the AVSession notification.
+  private mediaTitle: string = '';
+  private mediaArtist: string = '';
+  private mediaCoverUri: string = '';
+  private mediaDurationMs: number = 0;
+  private mediaIsLive: boolean = false;
+
   getUniqueClassName(): string {
     return 'NativeDualPlayer';
   }
@@ -253,6 +260,25 @@ export default class NativeDualPlayer implements FlutterPlugin {
         this.releaseAll();
         result.success(null);
         break;
+      case 'setMediaMetadata': {
+        this.mediaTitle = (call.argument('title') as string) ?? '';
+        this.mediaArtist = (call.argument('artist') as string) ?? '';
+        this.mediaCoverUri = (call.argument('coverUri') as string) ?? '';
+        this.mediaDurationMs = (call.argument('durationMs') as number) ?? 0;
+        this.mediaIsLive = (call.argument('isLive') as boolean) ?? false;
+        this.updateAVMetadata();
+        result.success(null);
+        break;
+      }
+      case 'updatePlaybackState': {
+        const stateStr = call.argument('state') as string;
+        const posMs = (call.argument('positionMs') as number) ?? 0;
+        const speed = (call.argument('speed') as number) ?? 1.0;
+        const bufferedMs = (call.argument('bufferedMs') as number) ?? 0;
+        this.updateAVPlaybackState(stateStr, posMs, speed, bufferedMs);
+        result.success(null);
+        break;
+      }
       default:
         result.notImplemented();
     }
@@ -415,6 +441,8 @@ export default class NativeDualPlayer implements FlutterPlugin {
       }
       this.channel?.invokeMethod('onPosition', ms);
       this.correctDrift(ms);
+      // Update AVSession playback position for notification progress bar.
+      this.updateAVPlaybackPosition(ms);
     });
 
     p.on('durationUpdate', (ms: number): void => {
@@ -422,6 +450,9 @@ export default class NativeDualPlayer implements FlutterPlugin {
         return;
       }
       this.channel?.invokeMethod('onDuration', ms);
+      // Update AVSession duration for notification progress bar.
+      this.mediaDurationMs = ms;
+      this.updateAVMetadata();
     });
 
     p.on('bufferingUpdate', (
@@ -598,6 +629,11 @@ export default class NativeDualPlayer implements FlutterPlugin {
     // Destroy AVSession on release.
     if (this.avSession !== null) {
       try {
+        this.avSession.off('play');
+        this.avSession.off('pause');
+        this.avSession.off('seek');
+        this.avSession.off('fastForward');
+        this.avSession.off('rewind');
         this.avSession.destroy();
       } catch (e) {
         Log.e(TAG, 'AVSession destroy failed: ' + JSON.stringify(e));
@@ -707,10 +743,140 @@ export default class NativeDualPlayer implements FlutterPlugin {
     try {
       this.avSession = await avSession.createAVSession(ctx, 'PiliPlusVideo', avSession.AVSessionType.VIDEO);
       this.avSession.activate();
+      // Register media control callbacks so the notification bar play/pause/seek
+      // buttons can control the player.
+      this.avSession.on('play', (): void => {
+        Log.i(TAG, 'AVSession: play command');
+        this.wantPlay = true;
+        if (this.videoReady && this.audioReady) {
+          this.playInternal();
+        }
+      });
+      this.avSession.on('pause', (): void => {
+        Log.i(TAG, 'AVSession: pause command');
+        this.wantPlay = false;
+        this.videoPlayer?.pause();
+        this.audioPlayer?.pause();
+      });
+      this.avSession.on('seek', (ms: number): void => {
+        Log.i(TAG, 'AVSession: seek command ms=' + ms);
+        this.seekBoth(ms);
+      });
+      this.avSession.on('fastForward', (): void => {
+        Log.i(TAG, 'AVSession: fastForward command');
+        this.seekBoth(Math.min(
+          (this.videoPlayer?.currentTime ?? 0) + 10000,
+          this.mediaDurationMs,
+        ));
+      });
+      this.avSession.on('rewind', (): void => {
+        Log.i(TAG, 'AVSession: rewind command');
+        this.seekBoth(Math.max(
+          (this.videoPlayer?.currentTime ?? 0) - 10000,
+          0,
+        ));
+      });
+      // Set initial metadata & playback state on the AVSession.
+      this.updateAVMetadata();
+      this.updateAVPlaybackState('paused', 0, 1.0, 0);
       Log.i(TAG, 'AVSession created and activated');
     } catch (e) {
       Log.e(TAG, 'createAVSession failed: ' + JSON.stringify(e));
       this.avSession = null;
+    }
+  }
+
+  /**
+   * Update the media metadata shown in the notification bar (title, artist,
+   * cover image, duration, live flag).
+   */
+  private updateAVMetadata(): void {
+    if (this.avSession === null) {
+      return;
+    }
+    try {
+      const metadata: avSession.AVMetadata = {
+        assetId: '1',
+        title: this.mediaTitle || 'PiliPlus',
+        artist: this.mediaArtist || '',
+        mediaImage: this.mediaCoverUri || '',
+        duration: this.mediaDurationMs,
+        isLive: this.mediaIsLive,
+      };
+      this.avSession.setAVMetadata(metadata);
+    } catch (e) {
+      Log.e(TAG, 'setAVMetadata failed: ' + JSON.stringify(e));
+    }
+  }
+
+  /**
+   * Update the playback state shown in the notification bar (play/pause icon,
+   * progress bar, speed, buffered position).
+   */
+  private updateAVPlaybackState(stateStr: string, posMs: number, speed: number, bufferedMs: number): void {
+    if (this.avSession === null) {
+      return;
+    }
+    try {
+      let state: avSession.PlaybackState = avSession.PlaybackState.PLAYBACK_STATE_PAUSED;
+      switch (stateStr) {
+        case 'playing':
+          state = avSession.PlaybackState.PLAYBACK_STATE_PLAY;
+          break;
+        case 'paused':
+          state = avSession.PlaybackState.PLAYBACK_STATE_PAUSED;
+          break;
+        case 'buffering':
+          state = avSession.PlaybackState.PLAYBACK_STATE_BUFFERING;
+          break;
+        case 'completed':
+          state = avSession.PlaybackState.PLAYBACK_STATE_COMPLETED;
+          break;
+        case 'stopped':
+          state = avSession.PlaybackState.PLAYBACK_STATE_STOP;
+          break;
+        default:
+          break;
+      }
+      const playbackState: avSession.AVPlaybackState = {
+        state: state,
+        position: {
+          elapsedTime: posMs,
+          updateTime: Date.now(),
+        },
+        speed: speed,
+        bufferedTime: bufferedMs,
+        duration: this.mediaDurationMs,
+      };
+      this.avSession.setAVPlaybackState(playbackState);
+    } catch (e) {
+      Log.e(TAG, 'setAVPlaybackState failed: ' + JSON.stringify(e));
+    }
+  }
+
+  /**
+   * Lightweight position-only update for the notification bar progress bar.
+   * Called from the timeUpdate callback to keep the progress bar smooth.
+   */
+  private updateAVPlaybackPosition(ms: number): void {
+    if (this.avSession === null) {
+      return;
+    }
+    try {
+      const playbackState: avSession.AVPlaybackState = {
+        state: this.wantPlay ?
+          avSession.PlaybackState.PLAYBACK_STATE_PLAY :
+          avSession.PlaybackState.PLAYBACK_STATE_PAUSED,
+        position: {
+          elapsedTime: ms,
+          updateTime: Date.now(),
+        },
+        speed: this.videoPlayer?.state === media.PlaybackState.PLAYING ? (this.videoPlayer?.speed ?? 1.0) : 1.0,
+        duration: this.mediaDurationMs,
+      };
+      this.avSession.setAVPlaybackState(playbackState);
+    } catch (e) {
+      // Silently ignore — this is called frequently from timeUpdate.
     }
   }
 

@@ -954,6 +954,14 @@ class PlPlayerController with BlockConfigMixin {
         event,
         isLive,
       );
+      if (Platform.isOhos) {
+        OhosNativePlayer.updatePlaybackState(
+          state: event ? 'buffering' : (playerStatus.value.isPlaying ? 'playing' : 'paused'),
+          positionMs: _nativePositionMs,
+          speed: _playbackSpeed.value,
+          bufferedMs: buffered.value * 1000,
+        );
+      }
     };
     OhosNativePlayer.onPlayingChanged = (playing) {
       debugPrint('[NativePlayer] onPlayingChanged: $playing (isBuffering=${isBuffering.value}, playerStatus was ${playerStatus.value})');
@@ -989,6 +997,14 @@ class PlPlayerController with BlockConfigMixin {
         isBuffering.value,
         isLive,
       );
+      if (Platform.isOhos) {
+        OhosNativePlayer.updatePlaybackState(
+          state: playing ? 'playing' : 'paused',
+          positionMs: _nativePositionMs,
+          speed: _playbackSpeed.value,
+          bufferedMs: buffered.value * 1000,
+        );
+      }
     };
     OhosNativePlayer.onCompleted = () {
       debugPrint('[NativePlayer] onCompleted');
@@ -998,8 +1014,15 @@ class PlPlayerController with BlockConfigMixin {
         element(.completed);
       }
       makeHeartBeat(-1, type: .completed);
+      if (Platform.isOhos) {
+        OhosNativePlayer.updatePlaybackState(
+          state: 'completed',
+          positionMs: _nativePositionMs,
+          speed: _playbackSpeed.value,
+          bufferedMs: buffered.value * 1000,
+        );
+      }
     };
-    OhosNativePlayer.onError = (msg) {
       debugPrint('[NativePlayer] onError: $msg');
       isBuffering.value = false;
       dataStatus.value = DataStatus.error;
