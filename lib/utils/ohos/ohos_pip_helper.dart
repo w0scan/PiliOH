@@ -51,24 +51,26 @@ abstract final class OhosPipHelper {
   }
 
   /// Enter PiP for the mpv core identified by [handle] (the `player.handle`
-  /// address). [width]/[height] are the source video dimensions for the PiP
-  /// aspect ratio. When [autoStart] is true the system auto-starts PiP on
-  /// returning home.
+  /// address), or for the native AVPlayer when [isNativePlayer] is true.
+  /// [width]/[height] are the source video dimensions for the PiP aspect ratio.
+  /// When [autoStart] is true the system auto-starts PiP on returning home.
   static Future<bool> enterPip({
-    required int handle,
+    int? handle,
     required int width,
     required int height,
     bool autoStart = false,
     bool isPlaying = true,
+    bool isNativePlayer = false,
   }) async {
     _ensureHandler();
     try {
       final ok = await _channel.invokeMethod<bool>('enter', {
-        'handle': handle.toString(),
+        'handle': (handle ?? 0).toString(),
         'width': width,
         'height': height,
         'autoStart': autoStart,
         'isPlaying': isPlaying,
+        'isNativePlayer': isNativePlayer,
       });
       return ok ?? false;
     } catch (_) {

@@ -195,6 +195,7 @@ class PlPlayerController with BlockConfigMixin {
   late final bool autoPiP = Pref.autoPiP;
   bool get isPipMode =>
       (Platform.isAndroid && AndroidHelper.isPipMode) ||
+      (Platform.isOhos && OhosPipHelper.isInPip.value) ||
       (PlatformUtils.isDesktop && isDesktopPip);
   late bool isDesktopPip = false;
   late Rect _lastWindowBounds;
@@ -285,9 +286,14 @@ class PlPlayerController with BlockConfigMixin {
 
   void enterPip({bool autoEnter = false}) {
     if (isNativePlayer) {
-      if (!autoEnter) {
-        SmartDialog.showToast('原生播放器暂不支持画中画');
-      }
+      PageUtils.enterPip(
+        autoEnter: autoEnter,
+        width: width > 0 ? width : 16,
+        height: height > 0 ? height : 9,
+        isLive: isLive,
+        isPlaying: playerStatus.isPlaying,
+        isNativePlayer: true,
+      );
       return;
     }
     if (videoPlayerController != null) {
@@ -952,6 +958,16 @@ class PlPlayerController with BlockConfigMixin {
     OhosNativePlayer.onPlayingChanged = (playing) {
       debugPrint('[NativePlayer] onPlayingChanged: $playing (isBuffering=${isBuffering.value}, playerStatus was ${playerStatus.value})');
       WakelockPlus.toggle(enable: playing);
+      if (Platform.isOhos) {
+        OhosPipHelper.setPlaybackState(playing);
+        OhosPipHelper.onPlayPause = (bool play) {
+          if (play) {
+            OhosNativePlayer.play();
+          } else {
+            OhosNativePlayer.pause();
+          }
+        };
+      }
       playerStatus.value = playing ? .playing : .paused;
       if (playing) {
         // AVPlayer 从 preparing/buffering 过渡到 playing 时不一定发送 BUFFERING_END，

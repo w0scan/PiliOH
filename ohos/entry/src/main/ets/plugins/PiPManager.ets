@@ -6,6 +6,7 @@ import type common from '@ohos.app.ability.common';
 import type { BusinessError } from '@ohos.base';
 import { Log, MethodChannel } from '@ohos/flutter_ohos';
 import mpvVideo from 'libmedia_kit_ohos_video.so';
+import type NativeDualPlayer from './NativeDualPlayer';
 
 const TAG = 'PiPManager';
 
@@ -33,12 +34,15 @@ class PiPXComponentController extends XComponentController {
   }
 }
 
-// Drives OpenHarmony Picture-in-Picture for the media_kit mpv video output.
+// Drives OpenHarmony Picture-in-Picture for both the media_kit mpv video output
+// and the native dual-AVPlayer backend.
 //
-// One PiP window at a time (matching the single active player). The mpv core is
-// identified by its handle (the mpv_handle* address, passed from Dart as a
-// decimal string). Rendering is moved between the Flutter texture and the PiP
-// XComponent surface by the native `media_kit_ohos_video` module via rebind.
+// One PiP window at a time (matching the single active player). For mpv, the
+// core is identified by its handle (mpv_handle* address, decimal string) and
+// rendering is moved between the Flutter texture and the PiP XComponent surface
+// by the native `media_kit_ohos_video` module via rebind. For the native
+// AVPlayer, the video player's surfaceId is switched between the main
+// XComponent (PlatformView) and the PiP window's XComponent.
 export default class PiPManager {
   private static instance: PiPManager | null = null;
 
@@ -71,6 +75,14 @@ export default class PiPManager {
   // in sync. true = playing.
   private playing: boolean = true;
 
+  // Native dual-AVPlayer reference for PiP surface switching. When set,
+  // PiP operates in "native mode" — the AVPlayer's surfaceId is switched
+  // between the main XComponent and the PiP XComponent instead of using
+  // mpvVideo.rebind().
+  private nativePlayer: NativeDualPlayer | null = null;
+  // True when the current PiP session is for the native AVPlayer (not mpv).
+  private isNativeMode: boolean = false;
+
   setChannel(channel: MethodChannel): void {
     this.channel = channel;
   }
@@ -82,6 +94,23 @@ export default class PiPManager {
   setContext(context: common.BaseContext, mainWindow: window.Window): void {
     this.context = context;
     this.mainWindow = mainWindow;
+  }
+
+  // Register the native dual-AVPlayer for PiP surface switching. Called by
+  // NativeDualPlayer.onAttachedToEngine so PiPManager can reach it.
+  registerNativePlayer(player: NativeDualPlayer): void {
+    this.nativePlayer = player;
+    Log.i(TAG, 'nativePlayer registered');
+  }
+
+  unregisterNativePlayer(): void {
+    // If a native PiP session is active, stop it before dropping the reference.
+    if (this.isNativeMode && this.controller != null) {
+      this.exit();
+    }
+    this.nativePlayer = null;
+    this.isNativeMode = false;
+    Log.i(TAG, 'nativePlayer unregistered');
   }
 
   // Returns a usable UIContext or null, caching it once available.
@@ -113,16 +142,19 @@ export default class PiPManager {
     }
   }
 
-  // Start (or restart) a PiP session for the given mpv handle. width/height are
-  // the source video dimensions, used for the PiP aspect ratio.
+  // Start (or restart) a PiP session. For mpv, pass the handle (decimal string);
+  // for the native AVPlayer, pass isNativePlayer=true (handle is ignored).
+  // width/height are the source video dimensions, used for the PiP aspect ratio.
   async enter(
     handle: string,
     width: number,
     height: number,
     autoStart: boolean,
     isPlaying: boolean,
+    isNativePlayer: boolean = false,
   ): Promise<void> {
     this.playing = isPlaying;
+    this.isNativeMode = isNativePlayer;
     if (this.context == null) {
       Log.e(TAG, 'enter: no context');
       return;
@@ -139,7 +171,9 @@ export default class PiPManager {
 
     // If a session is already live, just (re)bind it to the new handle/size.
     if (this.controller != null) {
-      this.activeHandle = handle;
+      if (!isNativePlayer) {
+        this.activeHandle = handle;
+      }
       this.updateContentSize(width, height);
       try {
         await this.controller.startPiP();
@@ -149,7 +183,9 @@ export default class PiPManager {
       return;
     }
 
-    this.activeHandle = handle;
+    if (!isNativePlayer) {
+      this.activeHandle = handle;
+    }
     this.boundToPip = false;
 
     const w: number = width > 0 ? width : 16;
@@ -253,6 +289,23 @@ export default class PiPManager {
   // ----- surface lifecycle (called by PiPXComponentController) -----
 
   onPipSurfaceCreated(surfaceId: string): void {
+    if (this.isNativeMode) {
+      // Native AVPlayer mode: switch the video player's surface to the PiP
+      // window's XComponent surface.
+      if (this.nativePlayer == null) {
+        Log.e(TAG, 'onPipSurfaceCreated: nativePlayer is null');
+        return;
+      }
+      try {
+        this.nativePlayer.enterPip(surfaceId);
+        this.boundToPip = true;
+        Log.i(TAG, 'native player switched to pip surface: ' + surfaceId);
+      } catch (e) {
+        Log.e(TAG, 'native player enterPip failed: ' + JSON.stringify(e));
+      }
+      return;
+    }
+    // mpv mode: rebind the mpv render output onto the PiP surface.
     if (this.activeHandle == null) {
       return;
     }
@@ -271,13 +324,30 @@ export default class PiPManager {
   // ----- internals -----
 
   private rebindToFlutter(): void {
-    if (this.activeHandle == null || !this.boundToPip) {
+    if (!this.boundToPip) {
       return;
     }
-    try {
-      mpvVideo.rebindToFlutter(BigInt(this.activeHandle));
-    } catch (e) {
-      Log.e(TAG, 'rebindToFlutter failed: ' + JSON.stringify(e));
+    if (this.isNativeMode) {
+      // Native AVPlayer mode: switch the video player's surface back to the
+      // main XComponent (PlatformView).
+      if (this.nativePlayer != null) {
+        try {
+          this.nativePlayer.exitPip();
+          Log.i(TAG, 'native player switched back to main surface');
+        } catch (e) {
+          Log.e(TAG, 'native player exitPip failed: ' + JSON.stringify(e));
+        }
+      }
+    } else {
+      // mpv mode: rebind mpv render output back to the Flutter texture.
+      if (this.activeHandle == null) {
+        return;
+      }
+      try {
+        mpvVideo.rebindToFlutter(BigInt(this.activeHandle));
+      } catch (e) {
+        Log.e(TAG, 'rebindToFlutter failed: ' + JSON.stringify(e));
+      }
     }
     this.boundToPip = false;
   }
@@ -293,8 +363,9 @@ export default class PiPManager {
         break;
       case PiPWindow.PiPState.STOPPED:
       case PiPWindow.PiPState.ERROR:
-        // Make sure mpv is drawing into the Flutter texture again, then drop
-        // the controller so a later enter() rebuilds a fresh window.
+        // Make sure the video output is drawing into the main surface again
+        // (mpv: Flutter texture; native: main XComponent), then drop the
+        // controller so a later enter() rebuilds a fresh window.
         this.channel?.invokeMethod('onPipStateChanged', false);
         this.rebindToFlutter();
         this.cleanup();
@@ -317,5 +388,6 @@ export default class PiPManager {
     this.xcomponentController = null;
     this.activeHandle = null;
     this.boundToPip = false;
+    this.isNativeMode = false;
   }
 }

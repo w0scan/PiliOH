@@ -64,6 +64,7 @@ import 'package:PiliPlus/utils/path_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
+import 'package:PiliPlus/utils/ohos/ohos_native_player.dart';
 import 'package:PiliPlus/utils/ohos/ohos_pip_helper.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:canvas_danmaku/canvas_danmaku.dart';
@@ -341,11 +342,19 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
         if (player != null && player.state.playing) {
           _pauseDueToPauseUponEnteringBackgroundMode = true;
           player.pause();
+        } else if (plPlayerController.isNativePlayer &&
+            plPlayerController.playerStatus.isPlaying) {
+          _pauseDueToPauseUponEnteringBackgroundMode = true;
+          OhosNativePlayer.pause();
         }
       } else {
         if (_pauseDueToPauseUponEnteringBackgroundMode) {
           _pauseDueToPauseUponEnteringBackgroundMode = false;
-          player?.play();
+          if (player != null) {
+            player.play();
+          } else if (plPlayerController.isNativePlayer) {
+            OhosNativePlayer.play();
+          }
         }
       }
     }

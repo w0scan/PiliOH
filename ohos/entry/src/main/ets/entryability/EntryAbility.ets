@@ -80,8 +80,9 @@ export default class EntryAbility extends FlutterAbility {
             const height = call.argument('height') as number;
             const autoStart = call.argument('autoStart') as boolean;
             const isPlaying = call.argument('isPlaying') as boolean;
+            const isNativePlayer = call.argument('isNativePlayer') as boolean;
             PiPManager.getInstance()
-              .enter(handle, width, height, autoStart === true, isPlaying !== false)
+              .enter(handle, width, height, autoStart === true, isPlaying !== false, isNativePlayer === true)
               .then((): void => result.success(true))
               .catch((e: Object): void => {
                 Log.e(TAG, 'pip enter failed: ' + JSON.stringify(e));

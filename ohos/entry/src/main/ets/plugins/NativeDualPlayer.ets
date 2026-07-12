@@ -10,6 +10,7 @@ import {
 } from '@ohos/flutter_ohos';
 import type { BusinessError } from '@ohos.base';
 import { NativePlayerViewFactory, NativePlayerView } from './NativePlayerView';
+import PiPManager from './PiPManager';
 
 const TAG = 'NativeDualPlayer';
 
@@ -107,10 +108,13 @@ export default class NativeDualPlayer implements FlutterPlugin {
     const factory = new NativePlayerViewFactory(this);
     reg?.registerViewFactory(VIEW_TYPE, factory);
     this.viewFactory = factory;
+    // Register with PiPManager so PiP can switch the AVPlayer surface.
+    PiPManager.getInstance().registerNativePlayer(this);
     Log.i(TAG, 'attached');
   }
 
   onDetachedFromEngine(binding: FlutterPluginBinding): void {
+    PiPManager.getInstance().unregisterNativePlayer();
     this.releaseAll();
     this.channel?.setMethodCallHandler(null);
     this.channel = null;
@@ -147,6 +151,47 @@ export default class NativeDualPlayer implements FlutterPlugin {
   onViewSurfaceDestroyed(): void {
     this.surfaceId = '';
     Log.i(TAG, 'onViewSurfaceDestroyed');
+  }
+
+  // ----- PiP surface switching (called by PiPManager) -----
+
+  // Switch the video AVPlayer's surface to the PiP window's XComponent surface.
+  // Called when a PiP session starts and the PiP surface is ready.
+  enterPip(pipSurfaceId: string): void {
+    if (this.videoPlayer === null) {
+      Log.e(TAG, 'enterPip: no video player');
+      return;
+    }
+    try {
+      this.videoPlayer.surfaceId = pipSurfaceId;
+      // Re-apply video scale type after surface switch.
+      this.videoPlayer.videoScaleType = media.VideoScaleType.VIDEO_SCALE_TYPE_FIT;
+      Log.i(TAG, 'enterPip: switched video surface to pip: ' + pipSurfaceId);
+    } catch (e) {
+      Log.e(TAG, 'enterPip failed: ' + JSON.stringify(e));
+    }
+  }
+
+  // Switch the video AVPlayer's surface back to the main XComponent surface.
+  // Called when a PiP session ends.
+  exitPip(): void {
+    if (this.videoPlayer === null) {
+      Log.e(TAG, 'exitPip: no video player');
+      return;
+    }
+    if (this.surfaceId.length === 0) {
+      Log.e(TAG, 'exitPip: no main surface id');
+      return;
+    }
+    try {
+      this.videoPlayer.surfaceId = this.surfaceId;
+      this.videoPlayer.videoScaleType = media.VideoScaleType.VIDEO_SCALE_TYPE_FIT;
+      // Re-apply letterbox surface rect after switching back to main surface.
+      this.refreshSurfaceRect();
+      Log.i(TAG, 'exitPip: switched video surface back to main: ' + this.surfaceId);
+    } catch (e) {
+      Log.e(TAG, 'exitPip failed: ' + JSON.stringify(e));
+    }
   }
 
   // Called by NativePlayerView when the XComponent layout area changes

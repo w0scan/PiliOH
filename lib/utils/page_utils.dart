@@ -204,17 +204,17 @@ abstract final class PageUtils {
     required bool isLive,
     required bool isPlaying,
     int? ohosHandle,
+    bool isNativePlayer = false,
   }) {
     if (Platform.isOhos) {
-      if (ohosHandle != null) {
-        OhosPipHelper.enterPip(
-          handle: ohosHandle,
-          width: width ?? 16,
-          height: height ?? 9,
-          autoStart: autoEnter,
-          isPlaying: isPlaying,
-        );
-      }
+      OhosPipHelper.enterPip(
+        handle: ohosHandle,
+        width: width ?? 16,
+        height: height ?? 9,
+        autoStart: autoEnter,
+        isPlaying: isPlaying,
+        isNativePlayer: isNativePlayer,
+      );
       return;
     }
     if (width != null &&

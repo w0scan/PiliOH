@@ -32,6 +32,21 @@
 ### `ohos/entry/src/main/ets/plugins/NativePlayerView.ets`
 - **整个文件** — PlatformView + XComponent SURFACE渲染
 
+### `ohos/entry/src/main/ets/plugins/PiPManager.ets`
+- **整个文件** — OHOS画中画管理器
+- 需同时支持mpv（rebind纹理）和AVPlayer（切换surfaceId）两种PiP模式
+- `registerNativePlayer`/`unregisterNativePlayer` — 原生播放器注册/注销
+- `isNativeMode` — 区分mpv和AVPlayer的PiP模式
+
+### `lib/utils/ohos/ohos_pip_helper.dart`
+- `enterPip`的`isNativePlayer`参数 — 原生播放器PiP标志
+- `isInPip` ValueNotifier — PiP状态监听
+
+### `lib/plugin/pl_player/controller.dart`
+- `enterPip`中原生播放器分支 — 传递`isNativePlayer: true`
+- `isPipMode` getter — 需包含`Platform.isOhos && OhosPipHelper.isInPip.value`
+- `_setupNativeCallbacks`中的`OhosPipHelper.setPlaybackState`/`onPlayPause` — PiP控制面板同步
+
 ## 上游API变更适配注意
 
 上游可能重构以下API，同步时需注意OHOS适配代码的对应修改：
@@ -52,3 +67,4 @@
 3. **控件不显示** — `_videoWidget`中`Obx`监听`nativeVideoSize.value`导致平台视图销毁重建→使用`const NativePlayerPlatformView()`+非响应式尺寸
 4. **视频黑屏（AV1不支持）** — 设备不支持AV1硬解(错误码5400106)，`fnval`参数需注意
 5. **全屏视频拉伸** — SURFACE模式下XComponent不受Flutter布局约束（AspectRatio无效），需配合`VIDEO_SCALE_TYPE_FIT`+`setXComponentSurfaceRect`手动计算letterbox渲染区域保持比例；surface重建后需重新设置`videoScaleType`
+6. **原生播放器PiP** — `PiPManager`需同时支持mpv（rebind纹理）和AVPlayer（切换surfaceId）两种模式；`NativeDualPlayer`需提供`enterPip`/`exitPip`方法切换视频渲染surface；`isPipMode`需包含OHOS检查；原生播放器后台暂停需单独处理
