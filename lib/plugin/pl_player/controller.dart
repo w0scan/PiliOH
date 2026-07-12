@@ -288,8 +288,8 @@ class PlPlayerController with BlockConfigMixin {
     if (isNativePlayer) {
       PageUtils.enterPip(
         autoEnter: autoEnter,
-        width: width > 0 ? width : 16,
-        height: height > 0 ? height : 9,
+        width: (width ?? 0) > 0 ? width! : 16,
+        height: (height ?? 0) > 0 ? height! : 9,
         isLive: isLive,
         isPlaying: playerStatus.isPlaying,
         isNativePlayer: true,
