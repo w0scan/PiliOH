@@ -343,6 +343,8 @@ class VideoPlayerServiceHandler extends BaseAudioHandler with SeekHandler {
       );
     }
   }
+
+  void onPositionChange(Duration position) {
     if (!enableBackgroundPlay ||
         _item.isEmpty ||
         !PlPlayerController.instanceExists()) {

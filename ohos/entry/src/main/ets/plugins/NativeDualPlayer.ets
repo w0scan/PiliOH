@@ -725,8 +725,8 @@ export default class NativeDualPlayer implements FlutterPlugin {
     // Cancel the long-running background task.
     const ctx = NativeDualPlayer.abilityContext;
     if (ctx !== null) {
-      backgroundTaskManager.cancelBackgroundRunning(ctx).catch((e: BusinessError): void => {
-        Log.e(TAG, 'cancelBackgroundRunning failed: ' + JSON.stringify(e));
+      backgroundTaskManager.stopBackgroundRunning(ctx).catch((e: BusinessError): void => {
+        Log.e(TAG, 'stopBackgroundRunning failed: ' + JSON.stringify(e));
       });
     }
   }
@@ -741,7 +741,7 @@ export default class NativeDualPlayer implements FlutterPlugin {
       return;
     }
     try {
-      this.avSession = await avSession.createAVSession(ctx, 'PiliPlusVideo', avSession.AVSessionType.VIDEO);
+      this.avSession = await avSession.createAVSession(ctx, 'PiliPlusVideo', 'video');
       this.avSession.activate();
       // Register media control callbacks so the notification bar play/pause/seek
       // buttons can control the player.
@@ -801,7 +801,6 @@ export default class NativeDualPlayer implements FlutterPlugin {
         artist: this.mediaArtist || '',
         mediaImage: this.mediaCoverUri || '',
         duration: this.mediaDurationMs,
-        isLive: this.mediaIsLive,
       };
       this.avSession.setAVMetadata(metadata);
     } catch (e) {
@@ -818,13 +817,13 @@ export default class NativeDualPlayer implements FlutterPlugin {
       return;
     }
     try {
-      let state: avSession.PlaybackState = avSession.PlaybackState.PLAYBACK_STATE_PAUSED;
+      let state: avSession.PlaybackState = avSession.PlaybackState.PLAYBACK_STATE_PAUSE;
       switch (stateStr) {
         case 'playing':
           state = avSession.PlaybackState.PLAYBACK_STATE_PLAY;
           break;
         case 'paused':
-          state = avSession.PlaybackState.PLAYBACK_STATE_PAUSED;
+          state = avSession.PlaybackState.PLAYBACK_STATE_PAUSE;
           break;
         case 'buffering':
           state = avSession.PlaybackState.PLAYBACK_STATE_BUFFERING;
@@ -866,12 +865,12 @@ export default class NativeDualPlayer implements FlutterPlugin {
       const playbackState: avSession.AVPlaybackState = {
         state: this.wantPlay ?
           avSession.PlaybackState.PLAYBACK_STATE_PLAY :
-          avSession.PlaybackState.PLAYBACK_STATE_PAUSED,
+          avSession.PlaybackState.PLAYBACK_STATE_PAUSE,
         position: {
           elapsedTime: ms,
           updateTime: Date.now(),
         },
-        speed: this.videoPlayer?.state === media.PlaybackState.PLAYING ? (this.videoPlayer?.speed ?? 1.0) : 1.0,
+        speed: this.videoPlayer?.state === 'playing' ? this.speed : 1.0,
         duration: this.mediaDurationMs,
       };
       this.avSession.setAVPlaybackState(playbackState);

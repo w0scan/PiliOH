@@ -1023,6 +1023,7 @@ class PlPlayerController with BlockConfigMixin {
         );
       }
     };
+    OhosNativePlayer.onError = (msg) {
       debugPrint('[NativePlayer] onError: $msg');
       isBuffering.value = false;
       dataStatus.value = DataStatus.error;
