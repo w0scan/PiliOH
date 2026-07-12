@@ -66,5 +66,6 @@
 2. **加载指示器一直显示** — `isBuffering`初始值`true.obs`+`playerStatus`初始值`playing`→改为`false.obs`
 3. **控件不显示** — `_videoWidget`中`Obx`监听`nativeVideoSize.value`导致平台视图销毁重建→使用`const NativePlayerPlatformView()`+非响应式尺寸
 4. **视频黑屏（AV1不支持）** — 设备不支持AV1硬解(错误码5400106)，`fnval`参数需注意
-5. **全屏视频拉伸** — SURFACE模式下XComponent不受Flutter布局约束（AspectRatio无效），需配合`VIDEO_SCALE_TYPE_FIT`+`setXComponentSurfaceRect`手动计算letterbox渲染区域保持比例；surface重建后需重新设置`videoScaleType`
+5. **全屏视频拉伸** — SURFACE模式下XComponent不受Flutter布局约束（AspectRatio无效），需配合`VIDEO_SCALE_TYPE_FIT`保持视频比例；surface重建后需重新设置`videoScaleType`；**注意：`setXComponentSurfaceRect`不可用**——`onAreaChange`返回vp单位而`setXComponentSurfaceRect`期望px单位，vp→px转换会导致视频只在左上角小区域显示，应完全依赖`VIDEO_SCALE_TYPE_FIT`自动letterbox
 6. **原生播放器PiP** — `PiPManager`需同时支持mpv（rebind纹理）和AVPlayer（切换surfaceId）两种模式；`NativeDualPlayer`需提供`enterPip`/`exitPip`方法切换视频渲染surface；`isPipMode`需包含OHOS检查；原生播放器后台暂停需单独处理
+7. **后台播放中断** — OHOS应用切后台被系统暂停；需三要素：①`module.json5`声明`backgroundModes:["audioPlayback"]`+`ohos.permission.KEEP_BACKGROUND_RUNNING`权限 ②AVSession注册（不注册会被系统暂停音频）③`backgroundTaskManager.startBackgroundRunning`长时任务申请；`NativeDualPlayer`在playing状态启动AVSession+长时任务，paused/completed/release时停止；`EntryAbility`需设置`NativeDualPlayer.abilityContext`

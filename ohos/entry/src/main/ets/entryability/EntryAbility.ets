@@ -176,6 +176,10 @@ export default class EntryAbility extends FlutterAbility {
     // hasn't finished loadContent), so PiPManager resolves it lazily from the
     // window on first use.
     PiPManager.getInstance().setContext(this.context, mainWin);
+    // Provide the ability context to NativeDualPlayer so it can request
+    // background long-running tasks (for audio playback when the app is
+    // in the background) and create AVSession.
+    NativeDualPlayer.abilityContext = this.context;
   }
 
   private applyKeepScreenOn(): void {

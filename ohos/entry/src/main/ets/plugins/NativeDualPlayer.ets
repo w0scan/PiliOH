@@ -1,5 +1,9 @@
 import media from '@ohos.multimedia.media';
+import avSession from '@ohos.multimedia.avsession';
+import backgroundTaskManager from '@ohos.resourceschedule.backgroundTaskManager';
+import wantAgent from '@ohos.app.ability.wantAgent';
 import fileIo from '@ohos.file.fs';
+import type common from '@ohos.app.ability.common';
 import {
   FlutterPlugin,
   FlutterPluginBinding,
@@ -46,6 +50,9 @@ export const VIEW_TYPE = 'piliplus/native_player_view';
 export default class NativeDualPlayer implements FlutterPlugin {
   private channel: MethodChannel | null = null;
 
+  // UIAbilityContext for background task / AVSession, set by EntryAbility.
+  static abilityContext: common.UIAbilityContext | null = null;
+
   private videoPlayer: media.AVPlayer | null = null;
   private audioPlayer: media.AVPlayer | null = null;
 
@@ -81,14 +88,14 @@ export default class NativeDualPlayer implements FlutterPlugin {
 
   private openedFds: OpenedFile[] = [];
 
-  // Video dimensions (updated on prepared / widthUpdate), used to calculate
-  // letterbox surface rect so the video isn't stretched on fullscreen.
+  // Video dimensions (updated on prepared), sent to Dart for aspect ratio.
   private videoWidth: number = 0;
   private videoHeight: number = 0;
 
-  // Reference to the PlatformView factory so we can reach the current
-  // NativePlayerView and call setXComponentSurfaceRect on its controller.
-  private viewFactory: NativePlayerViewFactory | null = null;
+  // Background playback: AVSession + long-running task keep the app alive
+  // when the user switches away with "continue playing in background" on.
+  private avSession: avSession.AVSession | null = null;
+  private bgTaskRunning: boolean = false;
 
   getUniqueClassName(): string {
     return 'NativeDualPlayer';
@@ -107,7 +114,6 @@ export default class NativeDualPlayer implements FlutterPlugin {
     const reg = binding.getPlatformViewRegistry();
     const factory = new NativePlayerViewFactory(this);
     reg?.registerViewFactory(VIEW_TYPE, factory);
-    this.viewFactory = factory;
     // Register with PiPManager so PiP can switch the AVPlayer surface.
     PiPManager.getInstance().registerNativePlayer(this);
     Log.i(TAG, 'attached');
@@ -115,6 +121,7 @@ export default class NativeDualPlayer implements FlutterPlugin {
 
   onDetachedFromEngine(binding: FlutterPluginBinding): void {
     PiPManager.getInstance().unregisterNativePlayer();
+    this.stopBackgroundPlayback();
     this.releaseAll();
     this.channel?.setMethodCallHandler(null);
     this.channel = null;
@@ -137,8 +144,6 @@ export default class NativeDualPlayer implements FlutterPlugin {
         } catch (e) {
           Log.e(TAG, 're-apply videoScaleType failed: ' + JSON.stringify(e));
         }
-        // Re-apply letterbox surface rect after surface rebinding.
-        this.refreshSurfaceRect();
         Log.i(TAG, 'onViewSurfaceReady: rebound surface to existing player');
       } catch (e) {
         Log.e(TAG, 'rebind surface failed: ' + JSON.stringify(e));
@@ -186,81 +191,9 @@ export default class NativeDualPlayer implements FlutterPlugin {
     try {
       this.videoPlayer.surfaceId = this.surfaceId;
       this.videoPlayer.videoScaleType = media.VideoScaleType.VIDEO_SCALE_TYPE_FIT;
-      // Re-apply letterbox surface rect after switching back to main surface.
-      this.refreshSurfaceRect();
       Log.i(TAG, 'exitPip: switched video surface back to main: ' + this.surfaceId);
     } catch (e) {
       Log.e(TAG, 'exitPip failed: ' + JSON.stringify(e));
-    }
-  }
-
-  // Called by NativePlayerView when the XComponent layout area changes
-  // (e.g. fullscreen toggle).  Recalculates the letterbox surface rect so
-  // the video keeps its aspect ratio instead of being stretched.
-  updateSurfaceRect(containerWidth: number, containerHeight: number): void {
-    if (this.videoWidth <= 0 || this.videoHeight <= 0) {
-      return;
-    }
-    const view = this.viewFactory?.currentView;
-    if (view === null || view === undefined) {
-      return;
-    }
-    this.applySurfaceRect(view, containerWidth, containerHeight);
-  }
-
-  // Recalculate and apply the letterbox surface rect using the current
-  // container dimensions (from the NativePlayerView's cached area).
-  refreshSurfaceRect(): void {
-    if (this.videoWidth <= 0 || this.videoHeight <= 0) {
-      return;
-    }
-    const view = this.viewFactory?.currentView;
-    if (view === null || view === undefined) {
-      return;
-    }
-    const cw = view.containerWidth;
-    const ch = view.containerHeight;
-    if (cw <= 0 || ch <= 0) {
-      return;
-    }
-    this.applySurfaceRect(view, cw, ch);
-  }
-
-  private applySurfaceRect(view: NativePlayerView, cw: number, ch: number): void {
-    const vw = this.videoWidth;
-    const vh = this.videoHeight;
-    // Calculate letterbox rect: fit the video inside the container while
-    // preserving aspect ratio, centering the result.
-    const videoRatio = vw / vh;
-    const containerRatio = cw / ch;
-    let surfaceWidth: number;
-    let surfaceHeight: number;
-    let offsetX: number = 0;
-    let offsetY: number = 0;
-    if (videoRatio > containerRatio) {
-      // Video wider than container → fit width, letterbox top/bottom
-      surfaceWidth = cw;
-      surfaceHeight = cw / videoRatio;
-      offsetY = (ch - surfaceHeight) / 2;
-    } else {
-      // Video taller than container → fit height, pillarbox left/right
-      surfaceHeight = ch;
-      surfaceWidth = ch * videoRatio;
-      offsetX = (cw - surfaceWidth) / 2;
-    }
-    const rect: SurfaceRect = {
-      offsetX: Math.round(offsetX),
-      offsetY: Math.round(offsetY),
-      surfaceWidth: Math.round(surfaceWidth),
-      surfaceHeight: Math.round(surfaceHeight),
-    };
-    Log.i(TAG, 'applySurfaceRect: container=' + cw + 'x' + ch +
-      ', video=' + vw + 'x' + vh +
-      ', rect=' + JSON.stringify(rect));
-    try {
-      view.xController.setXComponentSurfaceRect(rect);
-    } catch (e) {
-      Log.e(TAG, 'setXComponentSurfaceRect failed: ' + JSON.stringify(e));
     }
   }
 
@@ -450,8 +383,6 @@ export default class NativeDualPlayer implements FlutterPlugin {
           this.videoHeight = p.height;
           Log.i(TAG, 'video prepared: size=' + this.videoWidth + 'x' + this.videoHeight);
           this.channel?.invokeMethod('onVideoSize', { w: this.videoWidth, h: this.videoHeight });
-          // Now that we know the video size, apply letterbox surface rect.
-          this.refreshSurfaceRect();
         } catch (e) {
           Log.e(TAG, 'get video size failed: ' + JSON.stringify(e));
         }
@@ -462,12 +393,15 @@ export default class NativeDualPlayer implements FlutterPlugin {
       } else if (state === 'playing') {
         Log.i(TAG, 'video playing → onPlayingChanged(true)');
         this.channel?.invokeMethod('onPlayingChanged', true);
+        this.startBackgroundPlayback();
       } else if (state === 'paused') {
         Log.i(TAG, 'video paused → onPlayingChanged(false)');
         this.channel?.invokeMethod('onPlayingChanged', false);
+        this.stopBackgroundPlayback();
       } else if (state === 'completed') {
         Log.i(TAG, 'video completed → onCompleted');
         this.channel?.invokeMethod('onCompleted', null);
+        this.stopBackgroundPlayback();
       } else if (state === 'stopped' || state === 'released' || state === 'idle') {
         Log.i(TAG, 'video state: ' + state);
       }
@@ -660,6 +594,16 @@ export default class NativeDualPlayer implements FlutterPlugin {
   private releaseAll(): void {
     this.wantPlay = false;
     this.pendingInit = null;
+    this.stopBackgroundPlayback();
+    // Destroy AVSession on release.
+    if (this.avSession !== null) {
+      try {
+        this.avSession.destroy();
+      } catch (e) {
+        Log.e(TAG, 'AVSession destroy failed: ' + JSON.stringify(e));
+      }
+      this.avSession = null;
+    }
     // Invalidate any in-flight/queued setup, then tear down after it settles.
     this.genId++;
     this.runExclusive((): Promise<void> => this.resetPlayers());
@@ -697,6 +641,97 @@ export default class NativeDualPlayer implements FlutterPlugin {
       return media.PlaybackSpeed.SPEED_FORWARD_1_75_X;
     } else {
       return media.PlaybackSpeed.SPEED_FORWARD_2_00_X;
+    }
+  }
+
+  // -------------------------------------------------------------------------\
+  // Background playback (AVSession + long-running task)
+  // -------------------------------------------------------------------------\
+
+  // Start AVSession and background long-running task so the app is not
+  // suspended when the user switches away while media is playing.
+  private startBackgroundPlayback(): void {
+    if (this.bgTaskRunning) {
+      return;
+    }
+    const ctx = NativeDualPlayer.abilityContext;
+    if (ctx === null) {
+      Log.w(TAG, 'startBackgroundPlayback: no ability context');
+      return;
+    }
+    this.bgTaskRunning = true;
+
+    // Create / activate AVSession — required so the system doesn't pause
+    // the audio when the app goes to background.
+    this.ensureAVSession(ctx);
+
+    // Request a long-running background task so the app isn't suspended.
+    this.startBgTask(ctx);
+  }
+
+  // Stop AVSession and background long-running task when playback pauses /
+  // stops / completes, or the player is released.
+  private stopBackgroundPlayback(): void {
+    if (!this.bgTaskRunning) {
+      return;
+    }
+    this.bgTaskRunning = false;
+
+    // Deactivate AVSession.
+    if (this.avSession !== null) {
+      try {
+        this.avSession.deactivate();
+      } catch (e) {
+        Log.e(TAG, 'AVSession deactivate failed: ' + JSON.stringify(e));
+      }
+    }
+
+    // Cancel the long-running background task.
+    const ctx = NativeDualPlayer.abilityContext;
+    if (ctx !== null) {
+      backgroundTaskManager.cancelBackgroundRunning(ctx).catch((e: BusinessError): void => {
+        Log.e(TAG, 'cancelBackgroundRunning failed: ' + JSON.stringify(e));
+      });
+    }
+  }
+
+  private async ensureAVSession(ctx: common.UIAbilityContext): Promise<void> {
+    if (this.avSession !== null) {
+      try {
+        this.avSession.activate();
+      } catch (e) {
+        Log.e(TAG, 'AVSession activate failed: ' + JSON.stringify(e));
+      }
+      return;
+    }
+    try {
+      this.avSession = await avSession.createAVSession(ctx, 'PiliPlusVideo', avSession.AVSessionType.VIDEO);
+      this.avSession.activate();
+      Log.i(TAG, 'AVSession created and activated');
+    } catch (e) {
+      Log.e(TAG, 'createAVSession failed: ' + JSON.stringify(e));
+      this.avSession = null;
+    }
+  }
+
+  private async startBgTask(ctx: common.UIAbilityContext): Promise<void> {
+    try {
+      const wantAgentInfo: wantAgent.WantAgentInfo = {
+        wants: [
+          {
+            bundleName: ctx.abilityInfo.bundleName,
+            abilityName: ctx.abilityInfo.name,
+          },
+        ],
+        operationType: wantAgent.OperationType.START_ABILITY,
+        requestCode: 0,
+        wantAgentFlags: [wantAgent.WantAgentFlags.UPDATE_PRESENT_FLAG],
+      };
+      const agent = await wantAgent.getWantAgent(wantAgentInfo);
+      await backgroundTaskManager.startBackgroundRunning(ctx, backgroundTaskManager.BackgroundMode.AUDIO_PLAYBACK, agent);
+      Log.i(TAG, 'startBackgroundRunning succeeded');
+    } catch (e) {
+      Log.e(TAG, 'startBackgroundRunning failed: ' + JSON.stringify(e));
     }
   }
 }
