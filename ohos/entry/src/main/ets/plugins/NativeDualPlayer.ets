@@ -4,6 +4,8 @@ import backgroundTaskManager from '@ohos.resourceschedule.backgroundTaskManager'
 import wantAgent from '@ohos.app.ability.wantAgent';
 import fileIo from '@ohos.file.fs';
 import type common from '@ohos.app.ability.common';
+import http from '@ohos.net.http';
+import image from '@ohos.multimedia.image';
 import {
   FlutterPlugin,
   FlutterPluginBinding,
@@ -103,6 +105,7 @@ export default class NativeDualPlayer implements FlutterPlugin {
   private mediaCoverUri: string = '';
   private mediaDurationMs: number = 0;
   private mediaIsLive: boolean = false;
+  private mediaCoverPixelMap: image.PixelMap | null = null;
 
   getUniqueClassName(): string {
     return 'NativeDualPlayer';
@@ -266,7 +269,9 @@ export default class NativeDualPlayer implements FlutterPlugin {
         this.mediaCoverUri = (call.argument('coverUri') as string) ?? '';
         this.mediaDurationMs = (call.argument('durationMs') as number) ?? 0;
         this.mediaIsLive = (call.argument('isLive') as boolean) ?? false;
+        // Set metadata with URI first, then load PixelMap for the cover image.
         this.updateAVMetadata();
+        this.loadCoverImage(this.mediaCoverUri);
         result.success(null);
         break;
       }
@@ -626,6 +631,13 @@ export default class NativeDualPlayer implements FlutterPlugin {
     this.wantPlay = false;
     this.pendingInit = null;
     this.stopBackgroundPlayback();
+    // Release cover PixelMap
+    if (this.mediaCoverPixelMap !== null) {
+      try {
+        this.mediaCoverPixelMap.release();
+      } catch (_) {}
+      this.mediaCoverPixelMap = null;
+    }
     // Destroy AVSession on release.
     if (this.avSession !== null) {
       try {
@@ -799,7 +811,7 @@ export default class NativeDualPlayer implements FlutterPlugin {
         assetId: '1',
         title: this.mediaTitle || 'PiliPlus',
         artist: this.mediaArtist || '',
-        mediaImage: this.mediaCoverUri || '',
+        mediaImage: this.mediaCoverPixelMap ?? (this.mediaCoverUri || ''),
         duration: this.mediaDurationMs,
       };
       this.avSession.setAVMetadata(metadata);
@@ -897,6 +909,45 @@ export default class NativeDualPlayer implements FlutterPlugin {
       Log.i(TAG, 'startBackgroundRunning succeeded');
     } catch (e) {
       Log.e(TAG, 'startBackgroundRunning failed: ' + JSON.stringify(e));
+    }
+  }
+
+  /**
+   * Download cover image from network and create PixelMap for AVSession metadata.
+   * Falls back to URI string if download fails.
+   */
+  private async loadCoverImage(url: string): Promise<void> {
+    if (!url || url.length === 0) {
+      return;
+    }
+    try {
+      const httpClient = http.createHttp();
+      const response = await httpClient.request(url, {
+        method: http.RequestMethod.GET,
+        expectDataType: http.HttpDataType.ARRAY_BUFFER,
+        connectTimeout: 8000,
+        readTimeout: 8000,
+      });
+      httpClient.destroy();
+      if (response.responseCode !== 200 || !response.result) {
+        Log.w(TAG, 'loadCoverImage: HTTP ' + response.responseCode + ' for ' + url);
+        return;
+      }
+      const buf = response.result as ArrayBuffer;
+      const imageSource = image.createImageSource(buf);
+      const pixelMap = await imageSource.createPixelMap();
+      // Release old PixelMap if any
+      if (this.mediaCoverPixelMap !== null) {
+        try {
+          this.mediaCoverPixelMap.release();
+        } catch (_) {}
+      }
+      this.mediaCoverPixelMap = pixelMap;
+      // Re-set metadata with the PixelMap
+      this.updateAVMetadata();
+      Log.i(TAG, 'loadCoverImage: cover PixelMap loaded successfully');
+    } catch (e) {
+      Log.e(TAG, 'loadCoverImage failed: ' + JSON.stringify(e));
     }
   }
 }
