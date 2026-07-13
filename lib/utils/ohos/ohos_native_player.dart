@@ -30,6 +30,9 @@ abstract final class OhosNativePlayer {
   /// Playback reached the end.
   static void Function()? onCompleted;
 
+  static void Function()? onPlayPrevious;
+  static void Function()? onPlayNext;
+
   /// Fatal player error; argument is a human-readable message.
   static void Function(String message)? onError;
 
@@ -55,6 +58,10 @@ abstract final class OhosNativePlayer {
           onBuffering?.call(call.arguments == true);
         case 'onCompleted':
           onCompleted?.call();
+        case 'onPlayPrevious':
+          onPlayPrevious?.call();
+        case 'onPlayNext':
+          onPlayNext?.call();
         case 'onError':
           onError?.call(call.arguments?.toString() ?? '');
         case 'onVideoSize':

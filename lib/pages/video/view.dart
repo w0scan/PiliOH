@@ -58,6 +58,7 @@ import 'package:PiliPlus/utils/image_utils.dart';
 import 'package:PiliPlus/utils/max_screen_size.dart';
 import 'package:PiliPlus/utils/mobile_observer.dart';
 import 'package:PiliPlus/utils/num_utils.dart';
+import 'package:PiliPlus/utils/ohos/ohos_native_player.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
@@ -158,6 +159,11 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       ugcIntroController = Get.put(UgcIntroController(), tag: heroTag);
     } else {
       pgcIntroController = Get.put(PgcIntroController(), tag: heroTag);
+    }
+
+    if (Platform.isOhos) {
+      OhosNativePlayer.onPlayPrevious = () => introController.prevPlay();
+      OhosNativePlayer.onPlayNext = () => introController.nextPlay();
     }
 
     videoSourceInit();
@@ -354,6 +360,10 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       }
     }
     removeObserverMobile(this);
+    if (Platform.isOhos) {
+      OhosNativePlayer.onPlayPrevious = null;
+      OhosNativePlayer.onPlayNext = null;
+    }
 
     super.dispose();
   }
@@ -605,37 +615,23 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   }
 
   Widget _buildOverlayToolBar(double scrollRatio) {
-    final Icon icon;
-    final double spacing;
+    final IconData icon;
     final String playStat;
     if (videoDetailController.playedTime == null) {
-      spacing = 2;
-      icon = Icon(
-        Icons.play_arrow_rounded,
-        color: themeData.colorScheme.primary,
-      );
+      icon = Icons.play_arrow_rounded;
       playStat = '立即';
     } else if (plPlayerController!.isCompleted) {
-      spacing = 4;
-      icon = Icon(
-        size: 18,
-        Icons.replay_rounded,
-        color: themeData.colorScheme.primary,
-      );
+      icon = CustomIcons.replay_rounded;
       playStat = '重新';
     } else {
-      spacing = 2;
-      icon = Icon(
-        Icons.play_arrow_rounded,
-        color: themeData.colorScheme.primary,
-      );
+      icon = Icons.play_arrow_rounded;
       playStat = '继续';
     }
     final playBtn = Row(
-      spacing: spacing,
+      spacing: 2,
       mainAxisSize: .min,
       children: [
-        icon,
+        Icon(icon, color: themeData.colorScheme.primary),
         Text(
           '$playStat播放',
           style: TextStyle(color: themeData.colorScheme.primary),

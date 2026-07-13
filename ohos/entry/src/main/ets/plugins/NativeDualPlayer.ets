@@ -106,6 +106,7 @@ export default class NativeDualPlayer implements FlutterPlugin {
   private mediaDurationMs: number = 0;
   private mediaIsLive: boolean = false;
   private mediaCoverPixelMap: image.PixelMap | null = null;
+  private coverLoadId: number = 0;
 
   getUniqueClassName(): string {
     return 'NativeDualPlayer';
@@ -269,9 +270,9 @@ export default class NativeDualPlayer implements FlutterPlugin {
         this.mediaCoverUri = (call.argument('coverUri') as string) ?? '';
         this.mediaDurationMs = (call.argument('durationMs') as number) ?? 0;
         this.mediaIsLive = (call.argument('isLive') as boolean) ?? false;
-        // Set metadata with URI first, then load PixelMap for the cover image.
+        this.clearCoverPixelMap();
         this.updateAVMetadata();
-        this.loadCoverImage(this.mediaCoverUri);
+        this.loadCoverImage(this.mediaCoverUri, ++this.coverLoadId);
         result.success(null);
         break;
       }
@@ -428,7 +429,7 @@ export default class NativeDualPlayer implements FlutterPlugin {
       } else if (state === 'paused') {
         Log.i(TAG, 'video paused → onPlayingChanged(false)');
         this.channel?.invokeMethod('onPlayingChanged', false);
-        this.stopBackgroundPlayback();
+        this.stopBackgroundTask();
       } else if (state === 'completed') {
         Log.i(TAG, 'video completed → onCompleted');
         this.channel?.invokeMethod('onCompleted', null);
@@ -631,18 +632,15 @@ export default class NativeDualPlayer implements FlutterPlugin {
     this.wantPlay = false;
     this.pendingInit = null;
     this.stopBackgroundPlayback();
-    // Release cover PixelMap
-    if (this.mediaCoverPixelMap !== null) {
-      try {
-        this.mediaCoverPixelMap.release();
-      } catch (_) {}
-      this.mediaCoverPixelMap = null;
-    }
+    this.coverLoadId++;
+    this.clearCoverPixelMap();
     // Destroy AVSession on release.
     if (this.avSession !== null) {
       try {
         this.avSession.off('play');
         this.avSession.off('pause');
+        this.avSession.off('playPrevious');
+        this.avSession.off('playNext');
         this.avSession.off('seek');
         this.avSession.off('fastForward');
         this.avSession.off('rewind');
@@ -717,29 +715,28 @@ export default class NativeDualPlayer implements FlutterPlugin {
     this.startBgTask(ctx);
   }
 
-  // Stop AVSession and background long-running task when playback pauses /
-  // stops / completes, or the player is released.
-  private stopBackgroundPlayback(): void {
+  private stopBackgroundTask(): void {
     if (!this.bgTaskRunning) {
       return;
     }
     this.bgTaskRunning = false;
+    const ctx = NativeDualPlayer.abilityContext;
+    if (ctx !== null) {
+      backgroundTaskManager.stopBackgroundRunning(ctx).catch((e: BusinessError): void => {
+        Log.e(TAG, 'stopBackgroundRunning failed: ' + JSON.stringify(e));
+      });
+    }
+  }
 
-    // Deactivate AVSession.
+  private stopBackgroundPlayback(): void {
+    this.stopBackgroundTask();
+
     if (this.avSession !== null) {
       try {
         this.avSession.deactivate();
       } catch (e) {
         Log.e(TAG, 'AVSession deactivate failed: ' + JSON.stringify(e));
       }
-    }
-
-    // Cancel the long-running background task.
-    const ctx = NativeDualPlayer.abilityContext;
-    if (ctx !== null) {
-      backgroundTaskManager.stopBackgroundRunning(ctx).catch((e: BusinessError): void => {
-        Log.e(TAG, 'stopBackgroundRunning failed: ' + JSON.stringify(e));
-      });
     }
   }
 
@@ -769,6 +766,14 @@ export default class NativeDualPlayer implements FlutterPlugin {
         this.wantPlay = false;
         this.videoPlayer?.pause();
         this.audioPlayer?.pause();
+      });
+      this.avSession.on('playPrevious', (): void => {
+        Log.i(TAG, 'AVSession: playPrevious command');
+        this.channel?.invokeMethod('onPlayPrevious', null);
+      });
+      this.avSession.on('playNext', (): void => {
+        Log.i(TAG, 'AVSession: playNext command');
+        this.channel?.invokeMethod('onPlayNext', null);
       });
       this.avSession.on('seek', (ms: number): void => {
         Log.i(TAG, 'AVSession: seek command ms=' + ms);
@@ -912,42 +917,52 @@ export default class NativeDualPlayer implements FlutterPlugin {
     }
   }
 
-  /**
-   * Download cover image from network and create PixelMap for AVSession metadata.
-   * Falls back to URI string if download fails.
-   */
-  private async loadCoverImage(url: string): Promise<void> {
-    if (!url || url.length === 0) {
+  private clearCoverPixelMap(): void {
+    if (this.mediaCoverPixelMap === null) {
       return;
     }
     try {
-      const httpClient = http.createHttp();
+      this.mediaCoverPixelMap.release();
+    } catch (_) {}
+    this.mediaCoverPixelMap = null;
+  }
+
+  private async loadCoverImage(url: string, loadId: number): Promise<void> {
+    if (!url || url.length === 0) {
+      return;
+    }
+    const httpClient = http.createHttp();
+    let imageSource: image.ImageSource | null = null;
+    try {
       const response = await httpClient.request(url, {
         method: http.RequestMethod.GET,
         expectDataType: http.HttpDataType.ARRAY_BUFFER,
         connectTimeout: 8000,
         readTimeout: 8000,
       });
-      httpClient.destroy();
       if (response.responseCode !== 200 || !response.result) {
         Log.w(TAG, 'loadCoverImage: HTTP ' + response.responseCode + ' for ' + url);
         return;
       }
-      const buf = response.result as ArrayBuffer;
-      const imageSource = image.createImageSource(buf);
+      imageSource = image.createImageSource(response.result as ArrayBuffer);
       const pixelMap = await imageSource.createPixelMap();
-      // Release old PixelMap if any
-      if (this.mediaCoverPixelMap !== null) {
-        try {
-          this.mediaCoverPixelMap.release();
-        } catch (_) {}
+      if (loadId !== this.coverLoadId || url !== this.mediaCoverUri) {
+        pixelMap.release();
+        return;
       }
+      this.clearCoverPixelMap();
       this.mediaCoverPixelMap = pixelMap;
-      // Re-set metadata with the PixelMap
       this.updateAVMetadata();
       Log.i(TAG, 'loadCoverImage: cover PixelMap loaded successfully');
     } catch (e) {
       Log.e(TAG, 'loadCoverImage failed: ' + JSON.stringify(e));
+    } finally {
+      if (imageSource !== null) {
+        try {
+          imageSource.release();
+        } catch (_) {}
+      }
+      httpClient.destroy();
     }
   }
 }

@@ -87,8 +87,9 @@ class PlPlayerController with BlockConfigMixin {
   final RxInt position = RxInt(0);
 
   int _nativePositionMs = 0;
-  int get positionInMilliseconds =>
-      isNativePlayer ? _nativePositionMs : videoPlayerController?.state.position.inMilliseconds ?? 0;
+  int get positionInMilliseconds => isNativePlayer
+      ? _nativePositionMs
+      : videoPlayerController?.state.position.inMilliseconds ?? 0;
 
   final RxInt buffered = RxInt(0);
 
@@ -184,7 +185,12 @@ class PlPlayerController with BlockConfigMixin {
   final RxBool isBuffering = false.obs;
 
   /// 全屏方向
+  // ignore: unnecessary_getters_setters
   bool get isVertical => _isVertical;
+
+  set isVertical(bool value) {
+    _isVertical = value;
+  }
 
   /// 弹幕开关
   late final RxBool enableShowDanmaku = Pref.enableShowDanmaku.obs;
@@ -637,7 +643,9 @@ class PlPlayerController with BlockConfigMixin {
       // _playbackSpeed.value = speed;
       // 初始化数据加载状态
       dataStatus.value = DataStatus.loading;
-      debugPrint('[NativePlayer] switchDataSource: isNativePlayer=$isNativePlayer, dataStatus=loading');
+      debugPrint(
+        '[NativePlayer] switchDataSource: isNativePlayer=$isNativePlayer, dataStatus=loading',
+      );
       // 初始化全屏方向
       _isVertical = isVertical ?? false;
       _aid = aid;
@@ -679,7 +687,9 @@ class PlPlayerController with BlockConfigMixin {
       }
 
       dataStatus.value = .loaded;
-      debugPrint('[NativePlayer] switchDataSource: dataStatus=loaded, isBuffering=${isBuffering.value}, playerStatus=${playerStatus.value}');
+      debugPrint(
+        '[NativePlayer] switchDataSource: dataStatus=loaded, isBuffering=${isBuffering.value}, playerStatus=${playerStatus.value}',
+      );
 
       if (autoFullScreenFlag && autoEnterFullScreen) {
         triggerFullScreen(status: true);
@@ -905,7 +915,9 @@ class PlPlayerController with BlockConfigMixin {
       video = audio;
       audio = null;
     }
-    debugPrint('[NativePlayer] setSource: video=${video.substring(0, video.length > 80 ? 80 : video.length)}..., audio=${audio != null ? "yes" : "no"}, startMs=${seekTo?.inMilliseconds ?? 0}');
+    debugPrint(
+      '[NativePlayer] setSource: video=${video.substring(0, video.length > 80 ? 80 : video.length)}..., audio=${audio != null ? "yes" : "no"}, startMs=${seekTo?.inMilliseconds ?? 0}',
+    );
     await OhosNativePlayer.setSource(
       videoUrl: video,
       audioUrl: audio,
@@ -925,7 +937,9 @@ class PlPlayerController with BlockConfigMixin {
       await OhosNativePlayer.play();
       debugPrint('[NativePlayer] OhosNativePlayer.play() done');
     }
-    debugPrint('[NativePlayer] _createNativePlayer end, isBuffering=${isBuffering.value}, playerStatus=${playerStatus.value}, dataStatus=${dataStatus.value}');
+    debugPrint(
+      '[NativePlayer] _createNativePlayer end, isBuffering=${isBuffering.value}, playerStatus=${playerStatus.value}, dataStatus=${dataStatus.value}',
+    );
   }
 
   void _setupNativeCallbacks() {
@@ -947,7 +961,9 @@ class PlPlayerController with BlockConfigMixin {
       buffered.value = ms ~/ 1000;
     };
     OhosNativePlayer.onBuffering = (event) {
-      debugPrint('[NativePlayer] onBuffering: $event (isBuffering was ${isBuffering.value})');
+      debugPrint(
+        '[NativePlayer] onBuffering: $event (isBuffering was ${isBuffering.value})',
+      );
       isBuffering.value = event;
       videoPlayerServiceHandler?.onStatusChange(
         playerStatus.value,
@@ -956,7 +972,9 @@ class PlPlayerController with BlockConfigMixin {
       );
       if (Platform.isOhos) {
         OhosNativePlayer.updatePlaybackState(
-          state: event ? 'buffering' : (playerStatus.value.isPlaying ? 'playing' : 'paused'),
+          state: event
+              ? 'buffering'
+              : (playerStatus.value.isPlaying ? 'playing' : 'paused'),
           positionMs: _nativePositionMs,
           speed: _playbackSpeed.value,
           bufferedMs: buffered.value * 1000,
@@ -964,7 +982,9 @@ class PlPlayerController with BlockConfigMixin {
       }
     };
     OhosNativePlayer.onPlayingChanged = (playing) {
-      debugPrint('[NativePlayer] onPlayingChanged: $playing (isBuffering=${isBuffering.value}, playerStatus was ${playerStatus.value})');
+      debugPrint(
+        '[NativePlayer] onPlayingChanged: $playing (isBuffering=${isBuffering.value}, playerStatus was ${playerStatus.value})',
+      );
       WakelockPlus.toggle(enable: playing);
       if (Platform.isOhos) {
         OhosPipHelper.setPlaybackState(playing);
@@ -988,7 +1008,9 @@ class PlPlayerController with BlockConfigMixin {
       } else {
         _nativeWatch.stop();
       }
-      debugPrint('[NativePlayer] onPlayingChanged done: playerStatus=${playerStatus.value}, isBuffering=${isBuffering.value}');
+      debugPrint(
+        '[NativePlayer] onPlayingChanged done: playerStatus=${playerStatus.value}, isBuffering=${isBuffering.value}',
+      );
       for (final element in _statusListeners) {
         element(playerStatus.value);
       }
@@ -1058,7 +1080,9 @@ class PlPlayerController with BlockConfigMixin {
           .round();
       final p = _nativePosBase + Duration(milliseconds: elapsed);
       final dur = durationInMilliseconds;
-      _applyNativePosition(dur > 0 && p.inMilliseconds > dur ? Duration(milliseconds: dur) : p);
+      _applyNativePosition(
+        dur > 0 && p.inMilliseconds > dur ? Duration(milliseconds: dur) : p,
+      );
     });
   }
 
@@ -1087,7 +1111,9 @@ class PlPlayerController with BlockConfigMixin {
   // 开始播放
   Future<void> _initializePlayer() async {
     if (_instance == null) return;
-    debugPrint('[NativePlayer] _initializePlayer: isNativePlayer=$isNativePlayer, isBuffering=${isBuffering.value}, playerStatus=${playerStatus.value}');
+    debugPrint(
+      '[NativePlayer] _initializePlayer: isNativePlayer=$isNativePlayer, isBuffering=${isBuffering.value}, playerStatus=${playerStatus.value}',
+    );
     // 设置倍速
     if (isLive) {
       await setPlaybackSpeed(1.0);
@@ -1114,7 +1140,9 @@ class PlPlayerController with BlockConfigMixin {
       playIfExists();
       // await play(duration: duration);
     }
-    debugPrint('[NativePlayer] _initializePlayer done: isBuffering=${isBuffering.value}, playerStatus=${playerStatus.value}');
+    debugPrint(
+      '[NativePlayer] _initializePlayer done: isBuffering=${isBuffering.value}, playerStatus=${playerStatus.value}',
+    );
   }
 
   List<StreamSubscription>? _subscriptions;
@@ -1373,7 +1401,9 @@ class PlPlayerController with BlockConfigMixin {
   /// 播放视频
   Future<void> play({bool repeat = false, bool hideControls = true}) async {
     if (_playerCount == 0) return;
-    debugPrint('[NativePlayer] play: isNativePlayer=$isNativePlayer, isBuffering=${isBuffering.value}, playerStatus=${playerStatus.value}');
+    debugPrint(
+      '[NativePlayer] play: isNativePlayer=$isNativePlayer, isBuffering=${isBuffering.value}, playerStatus=${playerStatus.value}',
+    );
     // 播放时自动隐藏控制条
     controls = !hideControls;
     // repeat为true，将从头播放

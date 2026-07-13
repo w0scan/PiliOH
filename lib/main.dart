@@ -134,7 +134,7 @@ void main() async {
     if (Platform.isAndroid) MaxScreenSize.init();
     await Future.wait([
       if (Pref.horizontalScreen) ?fullMode() else ?portraitUpMode(),
-      if (!Platform.isOhos) setupServiceLocator(),
+      setupServiceLocator(),
     ]);
   } else if (Platform.isWindows) {
     if (await WebViewEnvironment.getAvailableVersion() != null) {

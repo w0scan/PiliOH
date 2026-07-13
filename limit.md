@@ -30,7 +30,7 @@
 - **整个文件** — OHOS双AVPlayer实现
 - `videoScaleType = VIDEO_SCALE_TYPE_FIT` — 保持视频比例
 - `setSource`/`tryStart`/`setupPlayers`/`bindVideoEvents`/`bindAudioEvents`/`maybeStart` 全部逻辑
-- **AVSession通知栏**：`mediaTitle`/`mediaArtist`/`mediaCoverUri`/`mediaDurationMs`/`mediaIsLive`元数据属性；`updateAVMetadata()`/`updateAVPlaybackState()`/`updateAVPlaybackPosition()`方法；`ensureAVSession`中控制命令回调注册（play/pause/seek/rewind/fastForward）；`setMediaMetadata`/`updatePlaybackState` MethodChannel处理器；`timeUpdate`/`durationUpdate`回调中的AVSession同步
+- **AVSession通知栏**：`mediaTitle`/`mediaArtist`/`mediaCoverUri`/`mediaDurationMs`/`mediaIsLive`元数据属性；`updateAVMetadata()`/`updateAVPlaybackState()`/`updateAVPlaybackPosition()`方法；`ensureAVSession`中控制命令回调注册（play/pause/playPrevious/playNext/seek/rewind/fastForward）；暂停时仅停止长时任务并保持AVSession激活，completed/release时才停用会话；`setMediaMetadata`/`updatePlaybackState` MethodChannel处理器；`timeUpdate`/`durationUpdate`回调中的AVSession同步
 
 ### `ohos/entry/src/main/ets/plugins/NativePlayerView.ets`
 - **整个文件** — PlatformView + XComponent SURFACE渲染
@@ -48,6 +48,7 @@
 ### `lib/utils/ohos/ohos_native_player.dart`
 - **整个文件** — OHOS原生播放器Dart桥接
 - `setMediaMetadata`/`updatePlaybackState` — AVSession通知栏元数据和播放状态同步
+- `onPlayPrevious`/`onPlayNext` — 通知栏上下曲命令桥接，视频页负责绑定到当前`CommonIntroController`
 
 ### `lib/plugin/pl_player/controller.dart`
 - `enterPip`中原生播放器分支 — 传递`isNativePlayer: true`
@@ -75,5 +76,5 @@
 4. **视频黑屏（AV1不支持）** — 设备不支持AV1硬解(错误码5400106)，`fnval`参数需注意
 5. **全屏视频拉伸** — SURFACE模式下XComponent不受Flutter布局约束（AspectRatio无效），需配合`VIDEO_SCALE_TYPE_FIT`保持视频比例；surface重建后需重新设置`videoScaleType`；**注意：`setXComponentSurfaceRect`不可用**——`onAreaChange`返回vp单位而`setXComponentSurfaceRect`期望px单位，vp→px转换会导致视频只在左上角小区域显示，应完全依赖`VIDEO_SCALE_TYPE_FIT`自动letterbox
 6. **原生播放器PiP** — `PiPManager`需同时支持mpv（rebind纹理）和AVPlayer（切换surfaceId）两种模式；`NativeDualPlayer`需提供`enterPip`/`exitPip`方法切换视频渲染surface；`isPipMode`需包含OHOS检查；原生播放器后台暂停需单独处理
-7. **后台播放中断** — OHOS应用切后台被系统暂停；需三要素：①`module.json5`声明`backgroundModes:["audioPlayback"]`+`ohos.permission.KEEP_BACKGROUND_RUNNING`权限 ②AVSession注册（不注册会被系统暂停音频）③`backgroundTaskManager.startBackgroundRunning`长时任务申请；`NativeDualPlayer`在playing状态启动AVSession+长时任务，paused/completed/release时停止；`EntryAbility`需设置`NativeDualPlayer.abilityContext`
-8. **通知栏播放控件** — AVSession需设置AVMetadata（title/artist/mediaImage/duration/isLive）+AVPlaybackState（state/position/speed/bufferedTime/duration）+控制命令回调（play/pause/seek/rewind/fastForward）；Dart端通过`OhosNativePlayer.setMediaMetadata`/`updatePlaybackState`传递媒体元数据和播放状态；`audio_handler.dart`中`setMediaItem`/`setPlaybackState`/`clear`添加OHOS平台分支；`pl_player/controller.dart`中OHOS原生播放器回调（onBuffering/onPlayingChanged/onCompleted）添加AVSession状态同步
+7. **后台播放中断** — OHOS应用切后台被系统暂停；需三要素：①`module.json5`声明`backgroundModes:["audioPlayback"]`+`ohos.permission.KEEP_BACKGROUND_RUNNING`权限 ②AVSession注册（不注册会被系统暂停音频）③`backgroundTaskManager.startBackgroundRunning`长时任务申请；`NativeDualPlayer`在playing状态启动AVSession+长时任务，paused时仅停止长时任务并保持会话激活，completed/release时才停用会话；`EntryAbility`需设置`NativeDualPlayer.abilityContext`
+8. **通知栏播放控件** — AVSession需设置AVMetadata（title/artist/mediaImage/duration/isLive）+AVPlaybackState（state/position/speed/bufferedTime/duration）+控制命令回调（play/pause/playPrevious/playNext/seek/rewind/fastForward）；暂停时必须保持AVSession激活才能从通知栏恢复播放；Dart端通过`OhosNativePlayer.setMediaMetadata`/`updatePlaybackState`传递媒体元数据和播放状态，并将上下曲回调绑定到当前视频页；`audio_handler.dart`中`setMediaItem`/`setPlaybackState`/`clear`添加OHOS平台分支；`pl_player/controller.dart`中OHOS原生播放器回调（onBuffering/onPlayingChanged/onCompleted）添加AVSession状态同步

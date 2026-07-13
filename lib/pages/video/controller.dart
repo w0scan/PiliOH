@@ -497,10 +497,10 @@ class VideoDetailController extends GetxController
       if (plPlayerController.isFullScreen.value || showVideoSheet) {
         PageUtils.showVideoBottomSheet(
           context,
+          isFullScreen: () => plPlayerController.isFullScreen.value,
           child: plPlayerController.darkVideoPage
               ? Theme(data: ThemeUtils.darkTheme, child: panel())
               : panel(),
-          isFullScreen: () => plPlayerController.isFullScreen.value,
         );
       } else {
         childKey.currentState?.showBottomSheet(
@@ -543,27 +543,6 @@ class VideoDetailController extends GetxController
   Future<void> seekTo(Duration duration, {required bool isSeek}) =>
       plPlayerController.seekTo(duration, isSeek: isSeek);
 
-  // Use pl_player's position listener pipeline instead of media_kit's
-  // stream.position — the pipeline is fed by both media_kit and the OHOS
-  // native player, so auto-skip works regardless of backend.
-  ValueChanged<Duration>? _blockPosListener;
-
-  @override
-  void startBlockListener() {
-    _blockPosListener = onBlockPosition;
-    plPlayerController.addPositionListener(_blockPosListener!);
-  }
-
-  @override
-  void cancelBlockListener() {
-    final l = _blockPosListener;
-    if (l != null) {
-      plPlayerController.removePositionListener(l);
-      _blockPosListener = null;
-    }
-    super.cancelBlockListener();
-  }
-
   @override
   Widget buildItem(Object item, Animation<double> animation) {
     final theme = ThemeUtils.theme;
@@ -589,7 +568,7 @@ class VideoDetailController extends GetxController
                 alpha: 0.8,
               ),
               textColor: theme.colorScheme.onSecondaryContainer,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const .symmetric(horizontal: 8, vertical: 4),
               fontSize: 14,
               text: item is SegmentModel
                   ? '跳过: ${item.segmentType.shortTitle}'
@@ -1012,10 +991,10 @@ class VideoDetailController extends GetxController
       );
       PageUtils.showVideoBottomSheet(
         context,
+        isFullScreen: () => plPlayerController.isFullScreen.value,
         child: plPlayerController.darkVideoPage
             ? Theme(data: ThemeUtils.darkTheme, child: child)
             : child,
-        isFullScreen: () => plPlayerController.isFullScreen.value,
       );
     } else {
       childKey.currentState?.showBottomSheet(
@@ -1350,10 +1329,10 @@ class VideoDetailController extends GetxController
       );
       PageUtils.showVideoBottomSheet(
         context,
+        isFullScreen: () => plPlayerController.isFullScreen.value,
         child: plPlayerController.darkVideoPage
             ? Theme(data: ThemeUtils.darkTheme, child: child)
             : child,
-        isFullScreen: () => plPlayerController.isFullScreen.value,
       );
     } else {
       childKey.currentState?.showBottomSheet(

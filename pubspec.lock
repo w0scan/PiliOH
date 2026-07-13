@@ -465,14 +465,6 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "2.0.8"
-  expandable:
-    dependency: "direct main"
-    description:
-      name: expandable
-      sha256: "9604d612d4d1146dafa96c6d8eec9c2ff0994658d6d09fed720ab788c7f5afc2"
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "5.0.1"
   extended_list_library:
     dependency: transitive
     description:
@@ -992,8 +984,8 @@ packages:
     dependency: "direct dev"
     description:
       path: "pkgs/jnigen"
-      ref: HEAD
-      resolved-ref: "5e2b3d1171cabe90bae969cd098c85182c1751b3"
+      ref: "55520836d363aac7f1ebae47387d03a30302be7b"
+      resolved-ref: "55520836d363aac7f1ebae47387d03a30302be7b"
       url: "https://github.com/dart-lang/native.git"
     source: git
     version: "0.17.0-wip"
