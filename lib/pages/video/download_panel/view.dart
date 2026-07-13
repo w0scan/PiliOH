@@ -17,6 +17,8 @@ import 'package:PiliPlus/pages/video/controller.dart';
 import 'package:PiliPlus/pages/video/introduction/ugc/controller.dart';
 import 'package:PiliPlus/pages/video/introduction/ugc/widgets/page.dart';
 import 'package:PiliPlus/services/download/download_service.dart';
+import 'package:PiliPlus/services/download/remote_cache_client.dart';
+import 'package:PiliPlus/services/download/remote_cache_service.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/date_utils.dart';
 import 'package:PiliPlus/utils/duration_utils.dart';
@@ -63,14 +65,29 @@ class DownloadPanel extends StatefulWidget {
 
 class _DownloadPanelState extends State<DownloadPanel> {
   final DownloadService _downloadService = Get.find<DownloadService>();
+  final RemoteCacheService _remoteService =
+      Get.isRegistered<RemoteCacheService>()
+      ? Get.find<RemoteCacheService>()
+      : Get.put(RemoteCacheService());
   final ListController _listController = ListController();
 
   late final cidSet = widget.cidSet;
   VideoQuality _quality = VideoQuality.fromCode(Pref.defaultVideoQa);
+  bool _isRemote = false;
+
+  Set<int> get _remoteCidSet => _remoteService.cidSet;
+
+  bool get _isRemoteAvailable {
+    final client = RemoteCacheClient.fromSettings();
+    return client != null;
+  }
 
   @override
   void initState() {
     super.initState();
+    if (_isRemoteAvailable) {
+      _remoteService.refresh();
+    }
     if (widget.index != -1) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _listController.jumpToItem(
@@ -149,8 +166,32 @@ class _DownloadPanelState extends State<DownloadPanel> {
               ),
             ),
           ),
+          const Spacer(),
+          SegmentedButton<bool>(
+            segments: const [
+              ButtonSegment(value: false, label: Text('本地')),
+              ButtonSegment(value: true, label: Text('远端')),
+            ],
+            selected: {_isRemote},
+            onSelectionChanged: (value) {
+              final wantRemote = value.first;
+              if (wantRemote && !_isRemoteAvailable) {
+                SmartDialog.showToast('请先配置远程缓存服务器');
+                return;
+              }
+              setState(() => _isRemote = wantRemote);
+              if (_isRemote) {
+                _remoteService.refresh();
+              }
+            },
+            style: ButtonStyle(
+              visualDensity: VisualDensity.compact,
+              textStyle: WidgetStatePropertyAll(
+                theme.textTheme.labelSmall,
+              ),
+            ),
+          ),
           if (kDebugMode || PlatformUtils.isMobile) ...[
-            const Spacer(),
             StreamBuilder(
               stream: Connectivity().onConnectivityChanged,
               builder: (context, snapshot) {
@@ -211,7 +252,7 @@ class _DownloadPanelState extends State<DownloadPanel> {
                             heroTag: widget.heroTag,
                             ugcIntroController: widget.ugcIntroController!,
                             bvid: episode.bvid ?? IdUtils.av2bv(episode.aid!),
-                            cidSet: cidSet,
+                            cidSet: _isRemote ? _remoteCidSet : cidSet,
                             onDownload: (Part part) => _onDownload(
                               index: index,
                               episode: part,
@@ -248,7 +289,10 @@ class _DownloadPanelState extends State<DownloadPanel> {
       return false;
     }
 
-    if (cidSet.contains(cid)) {
+    final alreadyCached = _isRemote
+        ? _remoteCidSet.contains(cid)
+        : cidSet.contains(cid);
+    if (alreadyCached) {
       if (kDebugMode) {
         SmartDialog.showToast('downloaded');
       }
@@ -285,39 +329,95 @@ class _DownloadPanelState extends State<DownloadPanel> {
     }
 
     try {
-      switch (episode) {
-        case Part part:
-          _downloadService.downloadVideo(
-            part,
-            parent == null ? widget.videoDetail : null,
-            parent,
-            _quality,
-          );
-          break;
-        case ugc.EpisodeItem episode:
-          _downloadService.downloadVideo(
-            episode.pages!.first,
-            null,
-            episode,
-            _quality,
-          );
-          break;
-        case pgc.EpisodeItem episode:
-          _downloadService.downloadBangumi(
-            index,
-            widget.pgcItem!,
-            episode,
-            _quality,
-          );
-          break;
+      if (_isRemote) {
+        _onRemoteDownload(index: index, episode: episode, parent: parent);
+      } else {
+        switch (episode) {
+          case Part part:
+            _downloadService.downloadVideo(
+              part,
+              parent == null ? widget.videoDetail : null,
+              parent,
+              _quality,
+            );
+            break;
+          case ugc.EpisodeItem episode:
+            _downloadService.downloadVideo(
+              episode.pages!.first,
+              null,
+              episode,
+              _quality,
+            );
+            break;
+          case pgc.EpisodeItem episode:
+            _downloadService.downloadBangumi(
+              index,
+              widget.pgcItem!,
+              episode,
+              _quality,
+            );
+            break;
+        }
       }
-      cidSet.add(cid);
+      if (!_isRemote) {
+        cidSet.add(cid);
+      }
       return true;
     } catch (e, s) {
       Utils.reportError(e, s);
       SmartDialog.showToast(e.toString());
     }
     return false;
+  }
+
+  Future<void> _submitRemoteDownload({
+    required int index,
+    required ugc.BaseEpisodeItem episode,
+    ugc.EpisodeItem? parent,
+  }) async {
+    switch (episode) {
+      case Part part:
+        await _downloadService.remoteDownloadVideo(
+          part,
+          parent == null ? widget.videoDetail : null,
+          parent,
+          _quality,
+        );
+      case ugc.EpisodeItem ep:
+        await _downloadService.remoteDownloadVideo(
+          ep.pages!.first,
+          null,
+          ep,
+          _quality,
+        );
+      case pgc.EpisodeItem ep:
+        await _downloadService.remoteDownloadBangumi(
+          index,
+          widget.pgcItem!,
+          ep,
+          _quality,
+        );
+    }
+  }
+
+  Future<void> _onRemoteDownload({
+    required int index,
+    required ugc.BaseEpisodeItem episode,
+    ugc.EpisodeItem? parent,
+  }) async {
+    try {
+      await _submitRemoteDownload(
+        index: index,
+        episode: episode,
+        parent: parent,
+      );
+      await _remoteService.refresh();
+      if (mounted) setState(() {});
+      SmartDialog.showToast('远端缓存任务已创建');
+    } catch (e, s) {
+      Utils.reportError(e, s);
+      SmartDialog.showToast('远端缓存失败：$e');
+    }
   }
 
   Widget _buildItem({
@@ -506,7 +606,10 @@ class _DownloadPanelState extends State<DownloadPanel> {
                                 ),
                               ],
                             ),
-                            if (!hasParts && cidSet.contains(cid))
+                            if (!hasParts &&
+                                (_isRemote
+                                    ? _remoteCidSet.contains(cid)
+                                    : cidSet.contains(cid)))
                               Positioned(
                                 bottom: 0,
                                 right: 0,
@@ -533,6 +636,7 @@ class _DownloadPanelState extends State<DownloadPanel> {
   }
 
   Widget _buildFooter(ThemeData theme, Color dividerColor) {
+    final targetLabel = _isRemote ? '远端' : '本地';
     return Container(
       color: theme.hoverColor,
       padding: EdgeInsets.only(
@@ -541,18 +645,22 @@ class _DownloadPanelState extends State<DownloadPanel> {
       child: Row(
         children: [
           _buildBottomBtn(
-            text: '缓存全部',
+            text: '缓存全部到$targetLabel',
             onTap: () {
               showConfirmDialog(
                 context: context,
-                title: const Text('确定缓存全部？'),
+                title: Text('确定缓存全部到$targetLabel？'),
                 onConfirm: () {
-                  for (int i = 0; i < widget.episodes.length; i++) {
-                    _onDownload(
-                      index: i,
-                      episode: widget.episodes[i],
-                      isDownloadAll: true,
-                    );
+                  if (_isRemote) {
+                    _downloadAllRemote();
+                  } else {
+                    for (int i = 0; i < widget.episodes.length; i++) {
+                      _onDownload(
+                        index: i,
+                        episode: widget.episodes[i],
+                        isDownloadAll: true,
+                      );
+                    }
                   }
                   if (mounted) setState(() {});
                 },
@@ -575,6 +683,56 @@ class _DownloadPanelState extends State<DownloadPanel> {
         ],
       ),
     );
+  }
+
+  Future<void> _downloadAllRemote() async {
+    final episodes = widget.episodes;
+    int submitted = 0;
+    int failed = 0;
+    for (int i = 0; i < episodes.length; i++) {
+      final episode = episodes[i];
+      final cid = episode.cid;
+      if (cid == null) continue;
+      if (_remoteCidSet.contains(cid)) continue;
+      if (kReleaseMode && episode.badge == '会员' && Accounts.mainEqVideo) {
+        if (vipStatus != 1) continue;
+      }
+      // Handle multi-part episodes
+      if (episode is ugc.EpisodeItem && episode.pages!.length > 1) {
+        for (int j = 0; j < episode.pages!.length; j++) {
+          final part = episode.pages![j];
+          if (_remoteCidSet.contains(part.cid)) {
+            continue;
+          }
+          try {
+            await _submitRemoteDownload(
+              index: j,
+              episode: part,
+              parent: episode,
+            );
+            submitted++;
+          } catch (e) {
+            failed++;
+          }
+        }
+        continue;
+      }
+      try {
+        await _submitRemoteDownload(index: i, episode: episode);
+        submitted++;
+      } catch (e) {
+        failed++;
+      }
+    }
+    await _remoteService.refresh();
+    if (mounted) {
+      setState(() {});
+      if (failed > 0) {
+        SmartDialog.showToast('完成 $submitted 个，失败 $failed 个');
+      } else if (submitted > 0) {
+        SmartDialog.showToast('已提交 $submitted 个远端缓存任务');
+      }
+    }
   }
 
   Widget _buildBottomBtn({

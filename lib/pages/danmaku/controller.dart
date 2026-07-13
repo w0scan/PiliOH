@@ -1,5 +1,5 @@
 import 'dart:collection';
-import 'dart:io' show File;
+import 'dart:io';
 
 import 'package:PiliPlus/grpc/bilibili/community/service/dm/v1.pb.dart';
 import 'package:PiliPlus/grpc/dm.dart';
@@ -119,17 +119,42 @@ class PlDanmakuController {
   @pragma('vm:notify-debugger-on-exception')
   Future<void> _initFileDm() async {
     try {
-      final file = File(
-        path.join(
-          (_plPlayerController.dataSource as FileSource).dir,
-          PathUtils.danmakuName,
-        ),
-      );
-      if (!file.existsSync()) return;
-      final bytes = await file.readAsBytes();
-      if (bytes.isEmpty) return;
-      final elem = DmSegMobileReply.fromBuffer(bytes).elems;
-      handleDanmaku(elem);
+      final dataSource = _plPlayerController.dataSource;
+      if (dataSource is FileSource) {
+        final file = File(
+          path.join(
+            dataSource.dir,
+            PathUtils.danmakuName,
+          ),
+        );
+        if (!file.existsSync()) return;
+        final bytes = await file.readAsBytes();
+        if (bytes.isEmpty) return;
+        final elem = DmSegMobileReply.fromBuffer(bytes).elems;
+        handleDanmaku(elem);
+      } else if (dataSource is NetworkSource && dataSource.danmakuUrl != null) {
+        final client = HttpClient();
+        try {
+          final request = await client.getUrl(Uri.parse(dataSource.danmakuUrl!));
+          if (dataSource.headers != null) {
+            dataSource.headers!.forEach((k, v) => request.headers.set(k, v));
+          }
+          final response = await request.close();
+          if (response.statusCode == 200) {
+            final builder = BytesBuilder(copy: false);
+            await for (final chunk in response) {
+              builder.add(chunk);
+            }
+            final bytes = builder.toBytes();
+            if (bytes.isNotEmpty) {
+              final elem = DmSegMobileReply.fromBuffer(bytes).elems;
+              handleDanmaku(elem);
+            }
+          }
+        } finally {
+          client.close();
+        }
+      }
     } catch (e, s) {
       Utils.reportError(e, s);
     }

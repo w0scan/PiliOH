@@ -16,11 +16,13 @@ import 'package:PiliPlus/models_new/video/video_detail/episode.dart' as ugc;
 import 'package:PiliPlus/models_new/video/video_detail/page.dart';
 import 'package:PiliPlus/pages/danmaku/controller.dart';
 import 'package:PiliPlus/services/download/download_manager.dart';
+import 'package:PiliPlus/services/download/remote_cache_client.dart';
 import 'package:PiliPlus/utils/cache_manager.dart';
 import 'package:PiliPlus/utils/extension/file_ext.dart';
 import 'package:PiliPlus/utils/extension/string_ext.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
 import 'package:PiliPlus/utils/path_utils.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
@@ -114,13 +116,29 @@ class DownloadService extends GetxService {
     ugc.EpisodeItem? videoArc,
     VideoQuality videoQuality,
   ) {
+    final entry = _buildVideoEntry(page, videoDetail, videoArc, videoQuality);
+    if (_hasLocalDownload(entry.cid)) return;
+    _createDownload(entry);
+  }
+
+  Future<String> remoteDownloadVideo(
+    Part page,
+    VideoDetailData? videoDetail,
+    ugc.EpisodeItem? videoArc,
+    VideoQuality videoQuality,
+  ) {
+    return _createRemoteDownload(
+      _buildVideoEntry(page, videoDetail, videoArc, videoQuality),
+    );
+  }
+
+  BiliDownloadEntryInfo _buildVideoEntry(
+    Part page,
+    VideoDetailData? videoDetail,
+    ugc.EpisodeItem? videoArc,
+    VideoQuality videoQuality,
+  ) {
     final cid = page.cid!;
-    if (downloadList.indexWhere((e) => e.cid == cid) != -1) {
-      return;
-    }
-    if (waitDownloadQueue.indexWhere((e) => e.cid == cid) != -1) {
-      return;
-    }
     final pageData = PageInfo(
       cid: cid,
       page: page.page!,
@@ -136,7 +154,7 @@ class DownloadService extends GetxService {
       downloadSubtitle: videoDetail?.title ?? videoArc!.title,
     );
     final currentTime = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    final entry = BiliDownloadEntryInfo(
+    return BiliDownloadEntryInfo(
       mediaType: 2,
       hasDashAudio: false,
       isCompleted: false,
@@ -165,7 +183,6 @@ class DownloadService extends GetxService {
       ownerName: videoDetail?.owner?.name ?? videoArc?.arc?.author?.name,
       pageData: pageData,
     );
-    _createDownload(entry);
   }
 
   void downloadBangumi(
@@ -174,13 +191,29 @@ class DownloadService extends GetxService {
     pgc.EpisodeItem episode,
     VideoQuality quality,
   ) {
+    final entry = _buildBangumiEntry(index, pgcItem, episode, quality);
+    if (_hasLocalDownload(entry.cid)) return;
+    _createDownload(entry);
+  }
+
+  Future<String> remoteDownloadBangumi(
+    int index,
+    PgcInfoModel pgcItem,
+    pgc.EpisodeItem episode,
+    VideoQuality quality,
+  ) {
+    return _createRemoteDownload(
+      _buildBangumiEntry(index, pgcItem, episode, quality),
+    );
+  }
+
+  BiliDownloadEntryInfo _buildBangumiEntry(
+    int index,
+    PgcInfoModel pgcItem,
+    pgc.EpisodeItem episode,
+    VideoQuality quality,
+  ) {
     final cid = episode.cid!;
-    if (downloadList.indexWhere((e) => e.cid == cid) != -1) {
-      return;
-    }
-    if (waitDownloadQueue.indexWhere((e) => e.cid == cid) != -1) {
-      return;
-    }
     final currentTime = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     final source = SourceInfo(
       avId: episode.aid!,
@@ -204,7 +237,7 @@ class DownloadService extends GetxService {
       bvid: episode.bvid ?? IdUtils.av2bv(source.avId),
       sortIndex: index,
     );
-    final entry = BiliDownloadEntryInfo(
+    return BiliDownloadEntryInfo(
       mediaType: 2,
       hasDashAudio: false,
       isCompleted: false,
@@ -234,7 +267,168 @@ class DownloadService extends GetxService {
       ownerName: pgcItem.upInfo?.uname,
       pageData: null,
     );
-    _createDownload(entry);
+  }
+
+  bool _hasLocalDownload(int cid) {
+    if (downloadList.indexWhere((e) => e.cid == cid) != -1) return true;
+    if (waitDownloadQueue.indexWhere((e) => e.cid == cid) != -1) return true;
+    return false;
+  }
+
+  Future<String> _createRemoteDownload(BiliDownloadEntryInfo entry) async {
+    final client = RemoteCacheClient.fromSettings();
+    if (client == null) throw StateError('请先配置远程缓存服务器');
+    if (!await client.health()) throw StateError('远程缓存服务器健康检查失败');
+
+    final mediaFileInfo = await _prepareEntryMedia(entry, resetProgress: true);
+    final danmakuBytes = await buildDanmakuBytes(entry: entry);
+    final coverBytes = await _downloadCoverBytes(entry.cover);
+    final taskKey = await client.createTask(
+      _remoteCreateBody(entry, mediaFileInfo),
+    );
+    await Future.wait([
+      client.upload(taskKey, 'danmaku', danmakuBytes),
+      client.upload(taskKey, 'cover', coverBytes),
+    ]);
+    return taskKey;
+  }
+
+  Future<void> updateRemoteEntry({
+    required String taskKey,
+    required BiliDownloadEntryInfo entry,
+  }) async {
+    final client = RemoteCacheClient.fromSettings();
+    if (client == null) throw StateError('请先配置远程缓存服务器');
+    if (!await client.health()) throw StateError('远程缓存服务器健康检查失败');
+
+    final mediaFileInfo = await _prepareEntryMedia(entry);
+    final danmakuBytes = await buildDanmakuBytes(entry: entry);
+    await Future.wait([
+      client.updateMetadata(taskKey, entry.toJson(), mediaFileInfo.toJson()),
+      client.upload(taskKey, 'danmaku', danmakuBytes),
+    ]);
+  }
+
+  Future<BiliDownloadMediaInfo> _prepareEntryMedia(
+    BiliDownloadEntryInfo entry, {
+    bool resetProgress = false,
+  }) async {
+    final mediaFileInfo = await DownloadHttp.getVideoUrl(
+      entry: entry,
+      ep: entry.ep,
+      source: entry.source,
+      pageData: entry.pageData,
+    );
+    switch (mediaFileInfo) {
+      case Type2 mediaFileInfo:
+        final first = mediaFileInfo.video.first;
+        entry.hasDashAudio = mediaFileInfo.audio?.isNotEmpty == true;
+        if (resetProgress) {
+          entry
+            ..isCompleted = false
+            ..downloadedBytes = 0
+            ..totalBytes = 0;
+        }
+        entry.pageData
+          ?..width = first.width
+          ..height = first.height;
+        entry.ep
+          ?..width = first.width
+          ..height = first.height;
+        break;
+      case Type1():
+        entry.hasDashAudio = false;
+        if (resetProgress) {
+          entry
+            ..isCompleted = false
+            ..downloadedBytes = 0
+            ..totalBytes = 0;
+        }
+        break;
+      case None(:final message):
+        throw StateError(message);
+    }
+    return mediaFileInfo;
+  }
+
+  Map<String, dynamic> _remoteCreateBody(
+    BiliDownloadEntryInfo entry,
+    BiliDownloadMediaInfo mediaFileInfo,
+  ) {
+    final quality = entry.typeTag;
+    final pageKey = entry.ep != null
+        ? <String, dynamic>{
+            'kind': 'pgc',
+            'seasonId': entry.seasonId ?? '',
+            'episodeId': entry.ep!.episodeId,
+            'quality': quality,
+          }
+        : <String, dynamic>{
+            'kind': 'ugc',
+            'avid': entry.avid,
+            'cid': entry.cid,
+            'quality': quality,
+          };
+    return {
+      'pageKey': pageKey,
+      'entryJson': entry.toJson(),
+      'indexJson': mediaFileInfo.toJson(),
+      ..._remoteMediaBody(mediaFileInfo),
+    };
+  }
+
+  Map<String, dynamic> _remoteMediaBody(BiliDownloadMediaInfo mediaFileInfo) {
+    return switch (mediaFileInfo) {
+      Type1(:final segmentList, :final httpHeader) => {
+        'video': <String, dynamic>{
+          'url': segmentList.first.url,
+          if (httpHeader.isNotEmpty) 'headers': httpHeader,
+        },
+      },
+      Type2(:final video, :final audio, :final httpHeader) => {
+        'video': <String, dynamic>{
+          'url': video.first.baseUrl,
+          if (httpHeader.isNotEmpty) 'headers': httpHeader,
+        },
+        if (audio?.firstOrNull != null)
+          'audio': <String, dynamic>{
+            'url': audio!.first.baseUrl,
+            if (httpHeader.isNotEmpty) 'headers': httpHeader,
+          },
+      },
+      None(:final message) => throw StateError(message),
+    };
+  }
+
+  Future<Uint8List> buildDanmakuBytes({
+    required BiliDownloadEntryInfo entry,
+  }) async {
+    final cid = entry.pageData?.cid ?? entry.source?.cid;
+    if (cid == null) throw StateError('null cid');
+    final seg = (entry.totalTimeMilli / PlDanmakuController.segmentLength)
+        .ceil();
+    if (seg <= 0) return Uint8List(0);
+    final res = await Future.wait([
+      for (var i = 1; i <= seg; i++)
+        DmGrpc.dmSegMobile(cid: cid, segmentIndex: i),
+    ]);
+    final danmaku = res.removeAt(0).data;
+    for (final i in res) {
+      if (i case Success(:final response)) {
+        danmaku.elems.addAll(response.elems);
+      }
+    }
+    return danmaku.writeToBuffer();
+  }
+
+  Future<Uint8List> _downloadCoverBytes(String cover) async {
+    final file = (await CacheManager.manager.getFileFromCache(cover))?.file;
+    if (file != null) return file.readAsBytes();
+    final res = await Request.dio.get<List<int>>(
+      cover,
+      options: Options(responseType: ResponseType.bytes),
+    );
+    return Uint8List.fromList(res.data!);
   }
 
   Future<void> _createDownload(BiliDownloadEntryInfo entry) async {
@@ -313,22 +507,8 @@ class DownloadService extends GetxService {
         if (!isUpdate) {
           _updateCurStatus(DownloadStatus.getDanmaku);
         }
-        final seg = (entry.totalTimeMilli / PlDanmakuController.segmentLength)
-            .ceil();
-
-        final res = await Future.wait([
-          for (var i = 1; i <= seg; i++)
-            DmGrpc.dmSegMobile(cid: cid, segmentIndex: i),
-        ]);
-
-        final danmaku = res.removeAt(0).data;
-        for (final i in res) {
-          if (i case Success(:final response)) {
-            danmaku.elems.addAll(response.elems);
-          }
-        }
-        res.clear();
-        await danmakuFile.writeAsBytes(danmaku.writeToBuffer());
+        final danmaku = await buildDanmakuBytes(entry: entry);
+        await danmakuFile.writeAsBytes(danmaku);
 
         return true;
       } catch (e) {

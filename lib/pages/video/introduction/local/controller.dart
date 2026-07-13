@@ -65,10 +65,10 @@ class LocalIntroController extends CommonIntroController {
     final currCid = videoDetailCtr.cid.value;
     final index = list.indexWhere((e) => e.cid == currCid);
     this.index.value = index;
-    if (PlatformUtils.isMobile) {
+    if (index >= 0 && PlatformUtils.isMobile) {
       onVideoDetailChange(list[index]);
     }
-    if (index != 0) {
+    if (index > 0) {
       SchedulerBinding.instance.addPostFrameCallback((_) {
         try {
           final state = videoDetailCtr.scrollKey.currentState;

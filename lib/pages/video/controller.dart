@@ -734,6 +734,7 @@ class VideoDetailController extends GetxController
               videoSource: args['remoteVideoUrl'],
               audioSource: args['remoteAudioUrl'],
               headers: Map<String, String>.from(args['remoteHeaders']),
+              danmakuUrl: args['remoteDanmakuUrl'],
             )
           : NetworkSource(
               videoSource: videoUrl!,

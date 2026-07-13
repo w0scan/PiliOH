@@ -559,8 +559,9 @@ class HeaderControlState extends State<HeaderControl>
                         },
                       ),
                       if ((isFileSource &&
-                              !(plPlayerController.dataSource as FileSource)
-                                  .isMp4) ||
+                              (plPlayerController.dataSource is! FileSource ||
+                                  !(plPlayerController.dataSource as FileSource)
+                                      .isMp4)) ||
                           (!isFileSource &&
                               videoDetailCtr.audioUrl?.isNotEmpty == true))
                         Obx(

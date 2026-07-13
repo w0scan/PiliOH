@@ -41,7 +41,9 @@ class _DownloadPageState extends State<DownloadPage> with GridMixin {
   final _downloadService = Get.find<DownloadService>();
   final _controller = Get.put(DownloadPageController());
   final _progress = ChangeNotifier();
-  final _remote = Get.put(RemoteCacheService());
+  final _remote = Get.isRegistered<RemoteCacheService>()
+      ? Get.find<RemoteCacheService>()
+      : Get.put(RemoteCacheService());
   bool showRemote = false;
 
   @override
@@ -304,6 +306,7 @@ class _DownloadPageState extends State<DownloadPage> with GridMixin {
                           'remoteAudioUrl': entry.hasDashAudio
                               ? client.fileUrl(item.taskKey, 'audio.m4s')
                               : null,
+                          'remoteDanmakuUrl': client.fileUrl(item.taskKey, 'danmaku.pb'),
                           'remoteHeaders': client.mediaHeaders,
                         },
                       )
@@ -312,6 +315,8 @@ class _DownloadPageState extends State<DownloadPage> with GridMixin {
                   onSelected: (action) async {
                     if (action == 'delete') {
                       await _remote.delete(item);
+                    } else if (action == 'update') {
+                      await _remote.updateDanmakuAndMetadata(item);
                     } else {
                       await _remote.action(item, action);
                     }
@@ -323,6 +328,10 @@ class _DownloadPageState extends State<DownloadPage> with GridMixin {
                       const PopupMenuItem(value: 'resume', child: Text('继续')),
                     if (status == 'failed')
                       const PopupMenuItem(value: 'retry', child: Text('重试')),
+                    const PopupMenuItem(
+                      value: 'update',
+                      child: Text('更新弹幕和元数据'),
+                    ),
                     const PopupMenuItem(value: 'delete', child: Text('删除')),
                   ],
                 ),

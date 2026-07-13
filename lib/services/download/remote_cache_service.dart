@@ -1,5 +1,7 @@
 import 'package:PiliPlus/models_new/download/bili_download_entry_info.dart';
+import 'package:PiliPlus/services/download/download_service.dart';
 import 'package:PiliPlus/services/download/remote_cache_client.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 
 class RemoteCacheEntry {
@@ -13,6 +15,11 @@ class RemoteCacheService extends GetxService {
   final entries = <RemoteCacheEntry>[].obs;
   final loading = false.obs;
   String? error;
+
+  Set<int> get cidSet => entries.map((e) => e.entry.cid).toSet();
+  bool hasCid(int cid) => entries.any((e) => e.entry.cid == cid);
+
+  bool hasTaskKey(String taskKey) => entries.any((e) => e.taskKey == taskKey);
 
   Future<void> refresh() async {
     final client = RemoteCacheClient.fromSettings();
@@ -52,5 +59,19 @@ class RemoteCacheService extends GetxService {
   Future<void> delete(RemoteCacheEntry entry) async {
     await RemoteCacheClient.fromSettings()!.delete(entry.taskKey);
     await refresh();
+  }
+
+  Future<void> updateDanmakuAndMetadata(RemoteCacheEntry entry) async {
+    try {
+      final downloadService = Get.find<DownloadService>();
+      await downloadService.updateRemoteEntry(
+        taskKey: entry.taskKey,
+        entry: entry.entry,
+      );
+      SmartDialog.showToast('更新成功');
+      await refresh();
+    } catch (e) {
+      SmartDialog.showToast('更新失败：$e');
+    }
   }
 }

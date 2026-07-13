@@ -15,17 +15,16 @@ class RemoteCacheClient {
 
   factory RemoteCacheClient._configured(String url, String token) {
     final baseUrl = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
-    final client = RemoteCacheClient._();
-    client._dio = Dio(
-      BaseOptions(
-        baseUrl: '$baseUrl/api/v1',
-        connectTimeout: const Duration(seconds: 8),
-        receiveTimeout: const Duration(seconds: 30),
-        headers: {'Authorization': 'Bearer $token'},
-      ),
-    );
-    client.baseUrl = baseUrl;
-    return client;
+    return RemoteCacheClient._()
+      .._dio = Dio(
+        BaseOptions(
+          baseUrl: '$baseUrl/api/v1',
+          connectTimeout: const Duration(seconds: 8),
+          receiveTimeout: const Duration(seconds: 30),
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      )
+      ..baseUrl = baseUrl;
   }
 
   late Dio _dio;
@@ -39,6 +38,13 @@ class RemoteCacheClient {
 
   Future<Map<String, dynamic>> create(Map<String, dynamic> body) async =>
       (await _dio.post<Map<String, dynamic>>('/cache', data: body)).data!;
+
+  Future<String> createTask(Map<String, dynamic> body) async {
+    final data = await create(body);
+    final taskKey = data['taskKey'] ?? data['key'];
+    if (taskKey is String && taskKey.isNotEmpty) return taskKey;
+    throw StateError('远程服务器未返回 taskKey');
+  }
 
   Future<void> upload(String taskKey, String type, Uint8List bytes) =>
       _dio.put<void>(

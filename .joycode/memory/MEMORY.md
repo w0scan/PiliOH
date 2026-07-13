@@ -1,0 +1,1 @@
+- [build_ohos](build_ohos.md) — OHOS HAP 构建命令和流程
