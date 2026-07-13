@@ -126,6 +126,10 @@ export default class EntryAbility extends FlutterAbility {
       onMethodCall: (call: MethodCall, result: MethodResult): void => {
         if (call.method === 'getDownloadDirectory') {
           result.success(OhosDownloadDirectory.resolve(this.context));
+        } else if (call.method === 'authorizeDownloadDirectory') {
+          OhosDownloadDirectory.ensureAuthorized(this.context)
+            .then((path: string): void => result.success(path))
+            .catch((): void => result.success(''));
         } else {
           result.notImplemented();
         }

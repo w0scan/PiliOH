@@ -146,6 +146,26 @@ Future<void> _initAppPath() async {
   appSupportDirPath = (await getApplicationSupportDirectory()).path;
 }
 
+bool _downloadAuthorizationStarted = false;
+
+void _authorizeOhosDownloadDirectory() {
+  if (!Platform.isOhos || _downloadAuthorizationStarted) {
+    return;
+  }
+  _downloadAuthorizationStarted = true;
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
+    final publicPath = await OhosDownloadDirectory.authorize();
+    if (publicPath == null || publicPath == downloadPath) {
+      return;
+    }
+    await _migrateOhosDownloads(publicPath);
+    downloadPath = publicPath;
+    try {
+      Get.find<DownloadService>().initDownloadList();
+    } catch (_) {}
+  });
+}
+
 void main() async {
   ScaledWidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
@@ -269,6 +289,7 @@ void main() async {
 
     if (Platform.isOhos) {
       runApp(const MyApp());
+      _authorizeOhosDownloadDirectory();
     } else {
       Catcher2(
         [?fileHandler, const ConsoleHandler()],
@@ -279,6 +300,7 @@ void main() async {
     }
   } else {
     runApp(const MyApp());
+    _authorizeOhosDownloadDirectory();
   }
 }
 

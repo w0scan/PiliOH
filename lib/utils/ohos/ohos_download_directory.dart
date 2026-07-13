@@ -5,9 +5,15 @@ abstract final class OhosDownloadDirectory {
     'piliplus/download_directory',
   );
 
-  static Future<String?> getPath() async {
+  static Future<String?> getPath() => _getPath('getDownloadDirectory');
+
+  static Future<String?> authorize() => _getPath(
+    'authorizeDownloadDirectory',
+  );
+
+  static Future<String?> _getPath(String method) async {
     try {
-      final path = await _channel.invokeMethod<String>('getDownloadDirectory');
+      final path = await _channel.invokeMethod<String>(method);
       return path == null || path.isEmpty ? null : path;
     } catch (_) {
       return null;
