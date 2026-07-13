@@ -14,6 +14,7 @@ import MediaKitVideoPlugin from '../plugins/MediaKitVideoPlugin';
 import NativeDualPlayer from '../plugins/NativeDualPlayer';
 import PiPManager from '../plugins/PiPManager';
 import FilePickerOhos from '../plugins/FilePickerOhos';
+import OhosDownloadDirectory from '../plugins/OhosDownloadDirectory';
 
 const TAG = 'EntryAbility';
 
@@ -113,6 +114,20 @@ export default class EntryAbility extends FlutterAbility {
           }
           default:
             result.notImplemented();
+        }
+      },
+    });
+
+    const downloadDirectoryChannel = new MethodChannel(
+      flutterEngine.getDartExecutor(),
+      'piliplus/download_directory',
+    );
+    downloadDirectoryChannel.setMethodCallHandler({
+      onMethodCall: (call: MethodCall, result: MethodResult): void => {
+        if (call.method === 'getDownloadDirectory') {
+          result.success(OhosDownloadDirectory.resolve(this.context));
+        } else {
+          result.notImplemented();
         }
       },
     });

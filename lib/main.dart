@@ -21,6 +21,7 @@ import 'package:PiliPlus/utils/date_utils.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
 import 'package:PiliPlus/utils/json_file_handler.dart';
 import 'package:PiliPlus/utils/max_screen_size.dart';
+import 'package:PiliPlus/utils/ohos/ohos_download_directory.dart';
 import 'package:PiliPlus/utils/path_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
@@ -51,8 +52,56 @@ WebViewEnvironment? webViewEnvironment;
 
 EdgeInsets? tmpPadding;
 
+Future<bool> _copyDirectoryMissing(Directory source, Directory target) async {
+  var copiedAll = true;
+  await target.create(recursive: true);
+  await for (final entity in source.list()) {
+    final targetPath = path.join(target.path, path.basename(entity.path));
+    if (entity is Directory) {
+      copiedAll =
+          await _copyDirectoryMissing(entity, Directory(targetPath)) &&
+          copiedAll;
+    } else if (entity is File) {
+      if (File(targetPath).existsSync()) {
+        copiedAll = false;
+      } else {
+        await entity.copy(targetPath);
+      }
+    }
+  }
+  return copiedAll;
+}
+
+Future<void> _migrateOhosDownloads(String publicPath) async {
+  final source = Directory(defDownloadPath);
+  if (!source.existsSync() || source.path == publicPath) {
+    return;
+  }
+  try {
+    final copiedAll = await _copyDirectoryMissing(
+      source,
+      Directory(publicPath),
+    );
+    if (copiedAll) {
+      await source.delete(recursive: true);
+    }
+  } catch (e) {
+    if (kDebugMode) {
+      debugPrint('OHOS download migration failed: $e');
+    }
+  }
+}
+
 Future<void> _initDownPath() async {
-  if (PlatformUtils.isDesktop) {
+  if (Platform.isOhos) {
+    final publicPath = await OhosDownloadDirectory.getPath();
+    if (publicPath != null) {
+      await _migrateOhosDownloads(publicPath);
+      downloadPath = publicPath;
+    } else {
+      downloadPath = defDownloadPath;
+    }
+  } else if (PlatformUtils.isDesktop) {
     final customDownPath = Pref.downloadPath;
     if (customDownPath != null && customDownPath.isNotEmpty) {
       try {
