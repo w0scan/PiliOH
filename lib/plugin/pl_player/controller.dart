@@ -1886,9 +1886,8 @@ class PlPlayerController with BlockConfigMixin {
     _removeListeners();
     _positionListeners.clear();
     _statusListeners.clear();
-    if (playerStatus.isPlaying) {
-      WakelockPlus.disable();
-    }
+    // 无条件关闭屏幕常亮，确保非播放状态也能正确释放
+    WakelockPlus.disable();
     if (kDebugMode) {
       debugPrint('dispose player');
     }

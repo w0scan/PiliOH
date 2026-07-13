@@ -59,6 +59,7 @@ import 'package:PiliPlus/utils/max_screen_size.dart';
 import 'package:PiliPlus/utils/mobile_observer.dart';
 import 'package:PiliPlus/utils/num_utils.dart';
 import 'package:PiliPlus/utils/ohos/ohos_native_player.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
@@ -393,6 +394,8 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
         ..removeStatusLister(playerListener)
         ..removePositionListener(positionListener)
         ..pause();
+      // 离开视频页面时确保屏幕常亮关闭，不依赖 playing 回调
+      WakelockPlus.disable();
     }
   }
 

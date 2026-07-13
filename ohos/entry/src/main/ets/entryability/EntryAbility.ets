@@ -48,7 +48,8 @@ export default class EntryAbility extends FlutterAbility {
       onMethodCall: (call: MethodCall, result: MethodResult): void => {
         switch (call.method) {
           case 'toggle':
-            this.keepScreenOn = call.args as boolean;
+            // 使用 !! 确保布尔类型转换，避免 call.args 类型不一致
+            this.keepScreenOn = !!call.args;
             this.applyKeepScreenOn();
             result.success(null);
             break;

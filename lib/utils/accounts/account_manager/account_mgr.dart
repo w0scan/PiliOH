@@ -252,6 +252,8 @@ class AccountManager extends Interceptor {
         return '响应超时，请稍后重试！';
       case .sendTimeout:
         return '发送请求超时，请检查网络设置';
+      case .transformTimeout:
+        return '数据转换超时，请稍后重试！';
       case .unknown:
         String desc;
         try {
