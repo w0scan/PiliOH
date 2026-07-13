@@ -12,9 +12,12 @@ sealed class DataSource {
 }
 
 class NetworkSource extends DataSource {
+  final Map<String, String>? headers;
+
   NetworkSource({
     required super.videoSource,
     required super.audioSource,
+    this.headers,
   });
 }
 

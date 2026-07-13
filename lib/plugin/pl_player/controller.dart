@@ -855,6 +855,12 @@ class PlPlayerController with BlockConfigMixin {
       }
     }
 
+    if (dataSource is NetworkSource && dataSource.headers != null) {
+      extras['http-header-fields'] = dataSource.headers!.entries
+          .map((entry) => '${entry.key}: ${entry.value}')
+          .join(',');
+    }
+
     String video = dataSource.videoSource;
     if (dataSource.audioSource case final audio? when (audio.isNotEmpty)) {
       if (onlyPlayAudio.value) {
@@ -921,10 +927,12 @@ class PlPlayerController with BlockConfigMixin {
     await OhosNativePlayer.setSource(
       videoUrl: video,
       audioUrl: audio,
-      headers: {
-        'User-Agent': BrowserUa.pc,
-        'Referer': HttpString.baseUrl,
-      },
+      headers: dataSource is NetworkSource && dataSource.headers != null
+          ? dataSource.headers!
+          : {
+              'User-Agent': BrowserUa.pc,
+              'Referer': HttpString.baseUrl,
+            },
       startMs: seekTo?.inMilliseconds ?? 0,
       syncMaster: Pref.nativeSyncMaster,
       syncThresholdMs: Pref.nativeSyncThresholdMs,

@@ -722,12 +722,18 @@ class VideoDetailController extends GetxController
       seek = getFirstSegment();
     }
     await plPlayerController.setDataSource(
-      isFileSource
+      isFileSource && args['remoteVideoUrl'] == null
           ? FileSource(
               dir: args['dirPath'],
               typeTag: entry.typeTag!,
               isMp4: entry.mediaType == 1,
               hasDashAudio: entry.hasDashAudio,
+            )
+          : isFileSource
+          ? NetworkSource(
+              videoSource: args['remoteVideoUrl'],
+              audioSource: args['remoteAudioUrl'],
+              headers: Map<String, String>.from(args['remoteHeaders']),
             )
           : NetworkSource(
               videoSource: videoUrl!,

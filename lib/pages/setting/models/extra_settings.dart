@@ -29,6 +29,7 @@ import 'package:PiliPlus/pages/setting/widgets/slider_dialog.dart';
 import 'package:PiliPlus/pages/video/reply/widgets/reply_item_grpc.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/services/download/download_service.dart';
+import 'package:PiliPlus/services/download/remote_cache_client.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/cache_manager.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
@@ -53,6 +54,13 @@ import 'package:get/get.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 
 List<SettingsModel> get extraSettings => [
+  NormalModel(
+    title: '远程离线缓存',
+    getSubtitle: () =>
+        Pref.remoteCacheUrl.isEmpty ? '未配置' : Pref.remoteCacheUrl,
+    leading: const Icon(Icons.cloud_outlined),
+    onTap: _showRemoteCacheDialog,
+  ),
   if (PlatformUtils.isDesktop) ...[
     SwitchModel(
       title: '退出时最小化',
@@ -708,6 +716,51 @@ Future<void> audioNormalization(
       setState();
     }
   }
+}
+
+void _showRemoteCacheDialog(BuildContext context, VoidCallback setState) {
+  final url = TextEditingController(text: Pref.remoteCacheUrl);
+  final token = TextEditingController(text: Pref.remoteCacheToken);
+  showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('远程离线缓存'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: url,
+            decoration: const InputDecoration(labelText: '服务器地址'),
+          ),
+          TextField(
+            controller: token,
+            obscureText: true,
+            decoration: const InputDecoration(labelText: 'API Token'),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: Get.back, child: const Text('取消')),
+        TextButton(
+          onPressed: () async {
+            await GStorage.setting.putAll({
+              SettingBoxKey.remoteCacheUrl: url.text.trim(),
+              SettingBoxKey.remoteCacheToken: token.text.trim(),
+            });
+            try {
+              final ok = await RemoteCacheClient.fromSettings()?.health();
+              SmartDialog.showToast(ok == true ? '连接成功' : '连接失败');
+            } catch (e) {
+              SmartDialog.showToast('连接失败: $e');
+            }
+            setState();
+            Get.back();
+          },
+          child: const Text('保存并测试'),
+        ),
+      ],
+    ),
+  );
 }
 
 void _showDownPathDialog(BuildContext context, VoidCallback setState) {

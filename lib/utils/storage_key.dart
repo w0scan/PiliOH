@@ -151,6 +151,8 @@ abstract final class SettingBoxKey {
       enableTapDm = 'enableTapDm',
       setSystemBrightness = 'setSystemBrightness',
       downloadPath = 'downloadPath',
+      remoteCacheUrl = 'remoteCacheUrl',
+      remoteCacheToken = 'remoteCacheToken',
       followOrderType = 'followOrderType',
       enableImgMenu = 'enableImgMenu',
       showDynDispute = 'showDynDispute',

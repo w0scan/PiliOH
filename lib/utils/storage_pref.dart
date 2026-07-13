@@ -992,6 +992,12 @@ abstract final class Pref {
 
   static String? get downloadPath => _setting.get(SettingBoxKey.downloadPath);
 
+  static String get remoteCacheUrl =>
+      _setting.get(SettingBoxKey.remoteCacheUrl, defaultValue: '');
+
+  static String get remoteCacheToken =>
+      _setting.get(SettingBoxKey.remoteCacheToken, defaultValue: '');
+
   static String? get liveCdnUrl => _setting.get(SettingBoxKey.liveCdnUrl);
 
   static bool get showBatteryLevel => _setting.get(
