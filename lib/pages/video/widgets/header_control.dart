@@ -70,7 +70,7 @@ import 'package:get/get.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
-import 'package:media_kit/media_kit.dart' show NativePlayer;
+import 'package:media_kit/media_kit.dart' show Player;
 
 mixin TimeBatteryMixin<T extends StatefulWidget> on State<T> {
   PlPlayerController get plPlayerController;
@@ -747,13 +747,15 @@ class HeaderControlState extends State<HeaderControl>
                     leading: const Icon(Icons.download_outlined, size: 20),
                     title: const Text('保存字幕', style: titleStyle),
                   ),
-                if (plPlayerController.videoPlayerController case final player?)
-                  ListTile(
-                    dense: true,
-                    title: const Text('播放信息', style: titleStyle),
-                    leading: const Icon(Icons.info_outline, size: 20),
-                    onTap: () => showPlayerInfo(context, player: player),
+                ListTile(
+                  dense: true,
+                  title: const Text('播放信息', style: titleStyle),
+                  leading: const Icon(Icons.info_outline, size: 20),
+                  onTap: () => showPlayerInfo(
+                    context,
+                    plPlayerController: plPlayerController,
                   ),
+                ),
                 ListTile(
                   dense: true,
                   onTap: () {
@@ -777,14 +779,53 @@ class HeaderControlState extends State<HeaderControl>
 
   static void showPlayerInfo(
     BuildContext context, {
-    required NativePlayer player,
+    PlPlayerController? plPlayerController,
+    Player? player,
   }) {
+    if (plPlayerController != null) {
+      final bool isNativePlayer =
+          Pref.useNativePlayer && !plPlayerController.isLive;
+      player = plPlayerController.videoPlayerController;
+      if (player == null) {
+        if (isNativePlayer) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('播放信息'),
+              content: ListTile(
+                dense: true,
+                title: const Text('播放器类型'),
+                subtitle: const Text('鸿蒙原生（双 AVPlayer）'),
+                onTap: () =>
+                    Utils.copyText('播放器类型\n鸿蒙原生（双 AVPlayer）'),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: Get.back,
+                  child: Text(
+                    '确定',
+                    style: TextStyle(color: ColorScheme.of(context).outline),
+                  ),
+                ),
+              ],
+            ),
+          );
+          return;
+        }
+        SmartDialog.showToast('播放器未初始化');
+        return;
+      }
+    }
+    if (player == null) {
+      SmartDialog.showToast('播放器未初始化');
+      return;
+    }
     final hwdec = player.getProperty('hwdec-current');
     final volume = player.getProperty('volume').subLength(3);
     showDialog(
       context: context,
       builder: (context) {
-        final state = player.state;
+        final state = player!.state;
         final colorScheme = ColorScheme.of(context);
         return AlertDialog(
           title: const Text('播放信息'),
@@ -796,6 +837,13 @@ class HeaderControlState extends State<HeaderControl>
               child: SingleChildScrollView(
                 child: Column(
                   children: [
+                    ListTile(
+                      dense: true,
+                      title: const Text('播放器类型'),
+                      subtitle: const Text('media_kit (mpv)'),
+                      onTap: () =>
+                          Utils.copyText('播放器类型\nmedia_kit (mpv)'),
+                    ),
                     ListTile(
                       dense: true,
                       title: const Text("Resolution"),
@@ -836,7 +884,7 @@ class HeaderControlState extends State<HeaderControl>
                       title: const Text("VideoTrack"),
                       subtitle: Text(state.track.video.toString()),
                       onTap: () =>
-                          Utils.copyText('VideoTrack\n${state.track.audio}'),
+                          Utils.copyText('VideoTrack\n${state.track.video}'),
                     ),
                     ListTile(
                       dense: true,

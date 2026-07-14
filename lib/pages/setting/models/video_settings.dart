@@ -170,6 +170,31 @@ List<SettingsModel> get videoSettings => [
     getSubtitle: () => '当前：${Pref.hardwareDecoding}（此项即mpv的--hwdec）',
     onTap: _showHwDecDialog,
   ),
+  if (Platform.isOhos) ...[
+    const SwitchModel(
+      title: '鸿蒙原生播放器（双 AVPlayer）',
+      subtitle: '使用系统 AVPlayer 分轨播放音视频，在线/离线均生效。'
+          '原生模式下无超分、无音频规范化、无 mpv 截图，弹幕不受影响。',
+      leading: Icon(Icons.smart_display_outlined),
+      setKey: SettingBoxKey.useNativePlayer,
+      defaultVal: false,
+      needReboot: true,
+    ),
+    NormalModel(
+      title: '同步主轨',
+      leading: const Icon(Icons.sync_alt_outlined),
+      getSubtitle: () => '当前：${Pref.nativeSyncMaster == 1 ? "以视频为主" : "以音频为主"}'
+          '（从轨追主轨）',
+      onTap: _showNativeSyncMasterDialog,
+    ),
+    NormalModel(
+      title: '音视频同步阈值',
+      leading: const Icon(Icons.timer_outlined),
+      getSubtitle: () => '当前：${Pref.nativeSyncThresholdMs}ms'
+          '（音视频时间差超过此值时，从轨 seek 追上主轨）',
+      onTap: _showNativeSyncThresholdDialog,
+    ),
+  ],
 ];
 
 Future<void> _showCDNDialog(BuildContext context, VoidCallback setState) async {
@@ -435,6 +460,73 @@ Future<void> _showHwDecDialog(
     );
     setState();
   }
+}
+
+Future<void> _showNativeSyncMasterDialog(
+  BuildContext context,
+  VoidCallback setState,
+) async {
+  final res = await showDialog<int>(
+    context: context,
+    builder: (context) => SelectDialog<int>(
+      title: '同步主轨',
+      value: Pref.nativeSyncMaster,
+      values: const [(0, '以音频为主'), (1, '以视频为主')],
+    ),
+  );
+  if (res != null) {
+    await GStorage.setting.put(SettingBoxKey.nativeSyncMaster, res);
+    setState();
+  }
+}
+
+void _showNativeSyncThresholdDialog(
+  BuildContext context,
+  VoidCallback setState,
+) {
+  String threshold = Pref.nativeSyncThresholdMs.toString();
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('音视频同步阈值（ms）'),
+      content: TextFormField(
+        autofocus: true,
+        initialValue: threshold,
+        keyboardType: TextInputType.number,
+        onChanged: (value) => threshold = value,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      ),
+      actions: [
+        TextButton(
+          onPressed: Get.back,
+          child: Text(
+            '取消',
+            style: TextStyle(color: ColorScheme.of(context).outline),
+          ),
+        ),
+        TextButton(
+          onPressed: () async {
+            try {
+              final value = int.parse(threshold);
+              if (value < 100) {
+                SmartDialog.showToast('阈值过小，至少 100ms');
+                return;
+              }
+              Get.back();
+              await GStorage.setting.put(
+                SettingBoxKey.nativeSyncThresholdMs,
+                value,
+              );
+              setState();
+            } catch (e) {
+              SmartDialog.showToast(e.toString());
+            }
+          },
+          child: const Text('确定'),
+        ),
+      ],
+    ),
+  );
 }
 
 void _showAutoSyncDialog(BuildContext context, VoidCallback setState) {

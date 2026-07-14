@@ -272,7 +272,7 @@ class _LiveHeaderControlState extends State<LiveHeaderControl>
                     ),
                     onTap: () => HeaderControlState.showPlayerInfo(
                       context,
-                      player: player,
+                      plPlayerController: plPlayerController,
                     ),
                   ),
                   if (PlatformUtils.isMobile)
