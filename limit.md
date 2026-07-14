@@ -78,3 +78,53 @@
 6. **原生播放器PiP** — `PiPManager`需同时支持mpv（rebind纹理）和AVPlayer（切换surfaceId）两种模式；`NativeDualPlayer`需提供`enterPip`/`exitPip`方法切换视频渲染surface；`isPipMode`需包含OHOS检查；原生播放器后台暂停需单独处理
 7. **后台播放中断** — OHOS应用切后台被系统暂停；需三要素：①`module.json5`声明`backgroundModes:["audioPlayback"]`+`ohos.permission.KEEP_BACKGROUND_RUNNING`权限 ②AVSession注册（不注册会被系统暂停音频）③`backgroundTaskManager.startBackgroundRunning`长时任务申请；`NativeDualPlayer`在playing状态启动AVSession+长时任务，paused时仅停止长时任务并保持会话激活，completed/release时才停用会话；`EntryAbility`需设置`NativeDualPlayer.abilityContext`
 8. **通知栏播放控件** — AVSession需设置AVMetadata（title/artist/mediaImage/duration/isLive）+AVPlaybackState（state/position/speed/bufferedTime/duration）+控制命令回调（play/pause/playPrevious/playNext/seek/rewind/fastForward）；暂停时必须保持AVSession激活才能从通知栏恢复播放；Dart端通过`OhosNativePlayer.setMediaMetadata`/`updatePlaybackState`传递媒体元数据和播放状态，并将上下曲回调绑定到当前视频页；`audio_handler.dart`中`setMediaItem`/`setPlaybackState`/`clear`添加OHOS平台分支；`pl_player/controller.dart`中OHOS原生播放器回调（onBuffering/onPlayingChanged/onCompleted）添加AVSession状态同步
+
+## 远端缓存播放（OHOS适配）
+
+### `lib/pages/video/download_panel/view.dart`
+- `RemoteCacheService` / `RemoteCacheClient` 导入和使用
+- `_isRemote` 状态 — 本地/远端切换标志
+- `_remoteCidSet` getter — 远端缓存cid集合
+- `_isRemoteAvailable` getter — 远端服务器配置检查
+- `initState` 中 `_remoteService.refresh()` 调用
+- `_buildHeader` 中 `SegmentedButton<bool>` 本地/远端切换UI
+- `cidSet` 传递 — `_isRemote ? _remoteCidSet : cidSet` 条件选择
+- `_onDownload` 中 `alreadyCached` — `_isRemote ? _remoteCidSet.contains(cid) : cidSet.contains(cid)` 条件检查
+
+### `lib/services/download/remote_cache_service.dart`
+- **整个文件** — 远端缓存服务（GetxService），管理远端缓存条目列表
+- `RemoteCacheEntry` 数据类 — taskKey/entry/task
+- `refresh()` — 从远端服务器刷新缓存列表
+- `action()` / `delete()` — 远端任务操作
+- `updateDanmakuAndMetadata()` — 更新远端条目的弹幕和元数据
+
+### `lib/services/download/download_service.dart`
+- `updateRemoteEntry()` — 更新远端缓存条目的弹幕和元数据
+- 远端缓存相关下载逻辑分支
+
+### `lib/services/download/remote_cache_client.dart`
+- 远端缓存HTTP客户端配置和API调用
+
+### `lib/pages/download/view.dart`
+- `remoteDanmakuUrl` 参数传递 — 远端弹幕下载URL
+
+### `lib/pages/video/controller.dart`
+- `danmakuUrl` 传入 `NetworkSource` — 远端弹幕加载
+
+### `lib/plugin/pl_player/models/data_source.dart`
+- `NetworkSource.danmakuUrl` 字段 — 支持从远端缓存服务器下载 danmaku.pb
+
+### `lib/pages/danmaku/controller.dart`
+- `NetworkSource as FileSource` 类型转换修复 — 防止崩溃
+- 远端弹幕下载加载逻辑
+
+### `lib/pages/video/introduction/local/controller.dart`
+- `index >= 0` 守卫 — 防止远端缓存条目不在本地列表时 `list[-1]` 越界
+
+### `lib/pages/video/widgets/header_control.dart`
+- `showPlayerInfo` 方法 — 双参数签名（`PlPlayerController?` + `Player?`），原生播放器分支显示"鸿蒙原生（双AVPlayer）"
+- 菜单项始终显示播放信息（不依赖 `videoPlayerController` 非空）
+
+### `lib/pages/setting/models/video_settings.dart`
+- `if (Platform.isOhos)` 三个原生播放器设置项：`useNativePlayer`开关、同步主轨、音视频同步阈值
+- `_showNativeSyncMasterDialog` / `_showNativeSyncThresholdDialog` 对话框函数
