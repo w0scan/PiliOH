@@ -75,6 +75,14 @@ class PendantAvatar extends StatelessWidget {
       width: size,
       height: size,
       type: ImageType.avatar,
+      getPlaceHolder: (url == null || url!.isEmpty)
+          ? () => DecoratedBox(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: colorScheme.onInverseSurface.withValues(alpha: 0.08),
+                ),
+              )
+          : null,
     );
     if (onTap != null) {
       avatar = GestureDetector(

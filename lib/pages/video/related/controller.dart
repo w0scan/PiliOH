@@ -18,13 +18,13 @@ class RelatedController
   final bool autoQuery;
 
   /// 搜索结果在列表中的起始索引，null表示无搜索结果
-  int? searchStartIndex;
+  final searchStartIndex = Rxn<int>();
 
   /// 分割线的GlobalKey，用于滚动定位
   final GlobalKey dividerKey = GlobalKey(debugLabel: 'searchDivider');
 
   /// 是否有搜索结果
-  bool get hasSearchResults => searchStartIndex != null;
+  bool get hasSearchResults => searchStartIndex.value != null;
 
   @override
   void onInit() {
@@ -69,7 +69,7 @@ class RelatedController
       if (filteredItems.isEmpty) return;
 
       if (loadingState.value case Success(:final response)) {
-        searchStartIndex = response?.length ?? 0;
+        searchStartIndex.value = response?.length ?? 0;
         response?.addAll(filteredItems);
         loadingState.refresh();
       }

@@ -1634,6 +1634,9 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       right: 12,
       bottom: 110,
       child: Obx(() {
+        if (!Get.isRegistered<RelatedController>(tag: heroTag)) {
+          return const SizedBox.shrink();
+        }
         final ctrl = Get.find<RelatedController>(tag: heroTag);
         if (!ctrl.hasSearchResults) return const SizedBox.shrink();
         return FloatingActionButton.small(
@@ -1642,6 +1645,25 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
           child: const Icon(Icons.search, size: 20),
         );
       }),
+    );
+  }
+
+  Widget _replyFab(String heroTag) {
+    return Positioned(
+      right: 12,
+      bottom: 170,
+      child: FloatingActionButton.small(
+        heroTag: 'reply_fab_$heroTag',
+        onPressed: () {
+          _videoReplyController.onReply(
+            null,
+            oid: _videoReplyController.aid,
+            replyType: _videoReplyController.videoType.replyType,
+          );
+        },
+        tooltip: '发表评论',
+        child: const Icon(Icons.reply, size: 20),
+      ),
     );
   }
 
@@ -1743,7 +1765,10 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       Widget child = Stack(
         children: [
           scrollView,
-          _searchFab(heroTag),
+          if (needRelated && videoDetailController.showRelatedVideo)
+            _searchFab(heroTag),
+          if (isNested && videoDetailController.showReply)
+            _replyFab(heroTag),
         ],
       );
       if (isNested) {

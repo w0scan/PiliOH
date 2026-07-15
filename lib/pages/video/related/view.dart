@@ -50,7 +50,7 @@ class _RelatedVideoPanelState extends State<RelatedVideoPanel> with GridMixin {
   }
 
   Widget _buildGrid(List<HotVideoItemModel> response) {
-    final searchIndex = _relatedController.searchStartIndex;
+    final searchIndex = _relatedController.searchStartIndex.value;
     if (searchIndex == null || searchIndex >= response.length) {
       // 无搜索结果，直接显示全部相关视频
       return SliverGrid.builder(
