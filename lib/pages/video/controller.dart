@@ -540,8 +540,31 @@ class VideoDetailController extends GetxController
   int get currPosInMilliseconds =>
       defaultST?.inMilliseconds ?? plPlayerController.positionInMilliseconds;
   @override
+  bool get isNativePlayerMode => plPlayerController.isNativePlayer;
+  @override
+  bool get isPlayerPlaying => plPlayerController.isNativePlayer
+      ? plPlayerController.playerStatus.value.isPlaying
+      : (player?.state.playing ?? false);
+  @override
   Future<void> seekTo(Duration duration, {required bool isSeek}) =>
       plPlayerController.seekTo(duration, isSeek: isSeek);
+
+  @override
+  void startBlockListener() {
+    if (plPlayerController.isNativePlayer) {
+      plPlayerController.addPositionListener(onBlockPosition);
+    } else {
+      super.startBlockListener();
+    }
+  }
+
+  @override
+  void cancelBlockListener() {
+    if (plPlayerController.isNativePlayer) {
+      plPlayerController.removePositionListener(onBlockPosition);
+    }
+    super.cancelBlockListener();
+  }
 
   @override
   Widget buildItem(Object item, Animation<double> animation) {

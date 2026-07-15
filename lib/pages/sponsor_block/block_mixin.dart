@@ -54,6 +54,8 @@ mixin BlockMixin on GetxController {
   bool get preInitPlayer;
   int get currPosInMilliseconds;
   bool get isFullScreen => false;
+  bool get isNativePlayerMode => false;
+  bool get isPlayerPlaying => player?.state.playing ?? false;
 
   bool get isUgc;
   late final isBlock = isUgc || !blockConfig.enablePgcSkip;
@@ -106,6 +108,7 @@ mixin BlockMixin on GetxController {
   }
 
   void startBlockListener() {
+    if (isNativePlayerMode) return;
     _blockListener = player?.stream.position.listen(onBlockPosition);
   }
 
@@ -141,7 +144,8 @@ mixin BlockMixin on GetxController {
                         '${videoLabel!.value.isNotEmpty ? '/' : ''}${segmentModel.segmentType.title}';
                   }
 
-                  if (_blockListener == null && autoPlay && player != null) {
+                  if (_blockListener == null && autoPlay &&
+                      (player != null || isNativePlayerMode)) {
                     final currPos = currPosInMilliseconds;
 
                     if (segmentModel.segment.contains(currPos)) {
@@ -151,7 +155,7 @@ mixin BlockMixin on GetxController {
                         case SkipType.alwaysSkip:
                         case SkipType.skipOnce:
                           segmentModel.hasSkipped = true;
-                          if (player!.state.playing) {
+                          if (isPlayerPlaying || isNativePlayerMode) {
                             future = onSkip(
                               segmentModel,
                             );
