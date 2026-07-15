@@ -47,6 +47,7 @@ import 'package:PiliPlus/utils/connectivity_utils.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
 import 'package:PiliPlus/utils/extension/string_ext.dart';
 import 'package:PiliPlus/utils/image_utils.dart';
+import 'package:PiliPlus/utils/duration_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
@@ -788,27 +789,118 @@ class HeaderControlState extends State<HeaderControl>
       player = plPlayerController.videoPlayerController;
       if (player == null) {
         if (isNativePlayer) {
+          final ctrl = plPlayerController;
+          final w = ctrl.width;
+          final h = ctrl.height;
+          final posMs = ctrl.positionInMilliseconds;
+          final durMs = ctrl.durationInMilliseconds;
+          final bufSec = ctrl.buffered.value;
+          final speed = ctrl.playbackSpeed;
+          final vol = (ctrl.volume.value * 100).toStringAsFixed(1);
+          final status = ctrl.playerStatus.value.name;
+          final syncMaster = Pref.nativeSyncMaster;
+          final syncThreshold = Pref.nativeSyncThresholdMs;
+          final resStr = (w != null && h != null) ? '${w}x$h' : '-';
+          final posStr = DurationUtils.formatDuration(posMs ~/ 1000);
+          final durStr = DurationUtils.formatDuration(durMs ~/ 1000);
+          final bufStr = DurationUtils.formatDuration(bufSec);
+          final syncMasterStr = syncMaster == 1 ? '视频' : '音频';
           showDialog(
             context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('播放信息'),
-              content: ListTile(
-                dense: true,
-                title: const Text('播放器类型'),
-                subtitle: const Text('鸿蒙原生（双 AVPlayer）'),
-                onTap: () =>
-                    Utils.copyText('播放器类型\n鸿蒙原生（双 AVPlayer）'),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: Get.back,
-                  child: Text(
-                    '确定',
-                    style: TextStyle(color: ColorScheme.of(context).outline),
+            builder: (context) {
+              final colorScheme = ColorScheme.of(context);
+              return AlertDialog(
+                title: const Text('播放信息'),
+                contentPadding: const EdgeInsets.only(top: 16),
+                content: Material(
+                  type: MaterialType.transparency,
+                  child: ListTileTheme(
+                    contentPadding: const .symmetric(horizontal: 24),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          ListTile(
+                            dense: true,
+                            title: const Text('播放器类型'),
+                            subtitle: const Text('鸿蒙原生（双 AVPlayer）'),
+                            onTap: () => Utils.copyText(
+                              '播放器类型\n鸿蒙原生（双 AVPlayer）',
+                            ),
+                          ),
+                          ListTile(
+                            dense: true,
+                            title: const Text('Resolution'),
+                            subtitle: Text(resStr),
+                            onTap: () =>
+                                Utils.copyText('Resolution\n$resStr'),
+                          ),
+                          ListTile(
+                            dense: true,
+                            title: const Text('Position'),
+                            subtitle: Text('$posStr / $durStr'),
+                            onTap: () => Utils.copyText(
+                              'Position\n$posStr / $durStr',
+                            ),
+                          ),
+                          ListTile(
+                            dense: true,
+                            title: const Text('Buffered'),
+                            subtitle: Text(bufStr),
+                            onTap: () =>
+                                Utils.copyText('Buffered\n$bufStr'),
+                          ),
+                          ListTile(
+                            dense: true,
+                            title: const Text('rate'),
+                            subtitle: Text(speed.toString()),
+                            onTap: () =>
+                                Utils.copyText('rate\n$speed'),
+                          ),
+                          ListTile(
+                            dense: true,
+                            title: const Text('Volume'),
+                            subtitle: Text(vol),
+                            onTap: () => Utils.copyText('Volume\n$vol'),
+                          ),
+                          ListTile(
+                            dense: true,
+                            title: const Text('Status'),
+                            subtitle: Text(status),
+                            onTap: () =>
+                                Utils.copyText('Status\n$status'),
+                          ),
+                          ListTile(
+                            dense: true,
+                            title: const Text('SyncMaster'),
+                            subtitle: Text(syncMasterStr),
+                            onTap: () => Utils.copyText(
+                              'SyncMaster\n$syncMasterStr',
+                            ),
+                          ),
+                          ListTile(
+                            dense: true,
+                            title: const Text('SyncThreshold'),
+                            subtitle: Text('${syncThreshold}ms'),
+                            onTap: () => Utils.copyText(
+                              'SyncThreshold\n${syncThreshold}ms',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ],
-            ),
+                actions: [
+                  TextButton(
+                    onPressed: Get.back,
+                    child: Text(
+                      '确定',
+                      style: TextStyle(color: colorScheme.outline),
+                    ),
+                  ),
+                ],
+              );
+            },
           );
           return;
         }
