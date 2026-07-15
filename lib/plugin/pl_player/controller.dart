@@ -1038,6 +1038,8 @@ class PlPlayerController with BlockConfigMixin {
     };
     OhosNativePlayer.onCompleted = () {
       debugPrint('[NativePlayer] onCompleted');
+      // 播放完成时确保屏幕常亮关闭
+      WakelockPlus.disable();
       playerStatus.value = .completed;
       _nativeWatch.stop();
       for (final element in _statusListeners) {
@@ -1055,6 +1057,8 @@ class PlPlayerController with BlockConfigMixin {
     };
     OhosNativePlayer.onError = (msg) {
       debugPrint('[NativePlayer] onError: $msg');
+      // 出错时确保屏幕常亮关闭
+      WakelockPlus.disable();
       isBuffering.value = false;
       dataStatus.value = DataStatus.error;
       playerStatus.value = PlayerStatus.paused;
@@ -1441,6 +1445,8 @@ class PlPlayerController with BlockConfigMixin {
     if (isNativePlayer) {
       await OhosNativePlayer.pause();
     }
+    // 暂停时确保屏幕常亮关闭，不依赖 playing 回调
+    WakelockPlus.disable();
     playerStatus.value = PlayerStatus.paused;
 
     // 主动暂停时让出音频焦点
