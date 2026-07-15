@@ -35,6 +35,7 @@ import 'package:PiliPlus/pages/video/introduction/ugc/widgets/page.dart';
 import 'package:PiliPlus/pages/video/introduction/ugc/widgets/season.dart';
 import 'package:PiliPlus/pages/video/member/controller.dart';
 import 'package:PiliPlus/pages/video/member/view.dart';
+import 'package:PiliPlus/pages/video/related/controller.dart';
 import 'package:PiliPlus/pages/video/related/view.dart';
 import 'package:PiliPlus/pages/video/reply/controller.dart';
 import 'package:PiliPlus/pages/video/reply/view.dart';
@@ -970,15 +971,20 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                           localIntroPanel()
                         else if (showIntro)
                           KeepAliveWrapper(
-                            child: CustomScrollView(
-                              key: const PageStorageKey(CommonIntroController),
-                              controller:
-                                  videoDetailController.effectiveIntroScrollCtr,
-                              slivers: [
-                                RelatedVideoPanel(
-                                  key: videoRelatedKey,
-                                  heroTag: heroTag,
+                            child: Stack(
+                              children: [
+                                CustomScrollView(
+                                  key: const PageStorageKey(CommonIntroController),
+                                  controller:
+                                      videoDetailController.effectiveIntroScrollCtr,
+                                  slivers: [
+                                    RelatedVideoPanel(
+                                      key: videoRelatedKey,
+                                      heroTag: heroTag,
+                                    ),
+                                  ],
                                 ),
+                                _searchFab(heroTag),
                               ],
                             ),
                           ),
@@ -1623,6 +1629,22 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     );
   }
 
+  Widget _searchFab(String heroTag) {
+    return Positioned(
+      right: 12,
+      bottom: 110,
+      child: Obx(() {
+        final ctrl = Get.find<RelatedController>(tag: heroTag);
+        if (!ctrl.hasSearchResults) return const SizedBox.shrink();
+        return FloatingActionButton.small(
+          heroTag: 'search_fab_$heroTag',
+          onPressed: ctrl.scrollToSearchResults,
+          child: const Icon(Icons.search, size: 20),
+        );
+      }),
+    );
+  }
+
   Widget localIntroPanel({
     bool needCtr = true,
   }) {
@@ -1658,7 +1680,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       return localIntroPanel(needCtr: needCtr);
     }
     Widget introPanel() {
-      Widget child = CustomScrollView(
+      Widget scrollView = CustomScrollView(
         key: const PageStorageKey(CommonIntroController),
         controller: needCtr
             ? videoDetailController.effectiveIntroScrollCtr
@@ -1716,6 +1738,12 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                   padding.bottom,
             ),
           ),
+        ],
+      );
+      Widget child = Stack(
+        children: [
+          scrollView,
+          _searchFab(heroTag),
         ],
       );
       if (isNested) {

@@ -7,6 +7,7 @@ import 'package:PiliPlus/models/model_owner.dart';
 import 'package:PiliPlus/models/search/result.dart';
 import 'package:PiliPlus/pages/common/common_list_controller.dart';
 import 'package:PiliPlus/utils/recommend_filter.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 class RelatedController
@@ -15,6 +16,15 @@ class RelatedController
   String bvid = Get.arguments['bvid'];
   String? title = Get.arguments['title'];
   final bool autoQuery;
+
+  /// 搜索结果在列表中的起始索引，null表示无搜索结果
+  int? searchStartIndex;
+
+  /// 分割线的GlobalKey，用于滚动定位
+  final GlobalKey dividerKey = GlobalKey(debugLabel: 'searchDivider');
+
+  /// 是否有搜索结果
+  bool get hasSearchResults => searchStartIndex != null;
 
   @override
   void onInit() {
@@ -59,9 +69,23 @@ class RelatedController
       if (filteredItems.isEmpty) return;
 
       if (loadingState.value case Success(:final response)) {
+        searchStartIndex = response?.length ?? 0;
         response?.addAll(filteredItems);
         loadingState.refresh();
       }
+    }
+  }
+
+  /// 滚动到搜索结果分割线位置
+  void scrollToSearchResults() {
+    final context = dividerKey.currentContext;
+    if (context != null) {
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        alignment: 0.0,
+      );
     }
   }
 

@@ -40,23 +40,83 @@ class _RelatedVideoPanelState extends State<RelatedVideoPanel> with GridMixin {
       Loading() => gridSkeleton,
       Success(:final response) =>
         response != null && response.isNotEmpty
-            ? SliverGrid.builder(
-                gridDelegate: gridDelegate,
-                itemBuilder: (context, index) {
-                  return VideoCardH(
-                    videoItem: response[index],
-                    onRemove: () => _relatedController.loadingState
-                      ..value.data!.removeAt(index)
-                      ..refresh(),
-                  );
-                },
-                itemCount: response.length,
-              )
+            ? _buildGrid(response)
             : const SliverToBoxAdapter(),
       Error(:final errMsg) => HttpError(
         errMsg: errMsg,
         onReload: _relatedController.onReload,
       ),
     };
+  }
+
+  Widget _buildGrid(List<HotVideoItemModel> response) {
+    final searchIndex = _relatedController.searchStartIndex;
+    if (searchIndex == null || searchIndex >= response.length) {
+      // 无搜索结果，直接显示全部相关视频
+      return SliverGrid.builder(
+        gridDelegate: gridDelegate,
+        itemBuilder: (context, index) => VideoCardH(
+          videoItem: response[index],
+          onRemove: () => _relatedController.loadingState
+            ..value.data!.removeAt(index)
+            ..refresh(),
+        ),
+        itemCount: response.length,
+      );
+    }
+
+    // 有搜索结果：相关视频 + 分割线 + 搜索结果
+    return SliverMainAxisGroup(
+      slivers: [
+        // 相关视频
+        SliverGrid.builder(
+          gridDelegate: gridDelegate,
+          itemBuilder: (context, index) => VideoCardH(
+            videoItem: response[index],
+            onRemove: () => _relatedController.loadingState
+              ..value.data!.removeAt(index)
+              ..refresh(),
+          ),
+          itemCount: searchIndex,
+        ),
+        // 分割线
+        SliverToBoxAdapter(
+          key: _relatedController.dividerKey,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                const Expanded(child: Divider(height: 1)),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Text(
+                    '搜索结果',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.outline,
+                    ),
+                  ),
+                ),
+                const Expanded(child: Divider(height: 1)),
+              ],
+            ),
+          ),
+        ),
+        // 搜索结果
+        SliverGrid.builder(
+          gridDelegate: gridDelegate,
+          itemBuilder: (context, index) {
+            final actualIndex = searchIndex + index;
+            return VideoCardH(
+              videoItem: response[actualIndex],
+              onRemove: () => _relatedController.loadingState
+                ..value.data!.removeAt(actualIndex)
+                ..refresh(),
+            );
+          },
+          itemCount: response.length - searchIndex,
+        ),
+      ],
+    );
   }
 }
